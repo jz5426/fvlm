@@ -42,6 +42,5 @@ if __name__ == "__main__":
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
     metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv"))
     rows = [row[1] for row in metadata.iterrows()]
-    # for row in rows:
-    #     generate_mask(row)
-    generate_mask(rows[0])
+    for row in rows:
+        generate_mask(row)
