@@ -90,7 +90,7 @@ if __name__ == "__main__":
     metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv"))
     rows = [row[1] for row in metadata.iterrows()]
 
-    # with concurrent.futures.ThreadPoolExecutor() as executor:
-    #     list(tqdm.tqdm(executor.map(process_row, rows), total=len(rows)))
-    process_row(rows[0])
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        list(tqdm.tqdm(executor.map(process_row, rows), total=len(rows)))
+    # process_row(rows[0])
     print('finished')
