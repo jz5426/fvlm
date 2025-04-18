@@ -28,6 +28,10 @@ def process_row(row):
     dirpath = os.path.dirname(filepath)
     dirpath = dirpath.replace(f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}/", f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed/")
 
+    # skip the files if not exists in the data directory
+    if not os.path.exists(filepath):
+        return 
+
     if os.path.exists(os.path.join(dirpath, os.path.basename(filepath))):
         return
 

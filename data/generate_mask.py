@@ -22,6 +22,10 @@ def generate_mask(row):
     dirpath = os.path.dirname(filepath)
     dirpath = dirpath.replace(f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed/", f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/")
 
+    # skip the files if not exists in the data directory
+    if not os.path.exists(filepath):
+        return 
+
     # NOTE: extension should be .nii.gz, not the h5 version.
     input_img = nib.load(filepath)
     output_img = totalsegmentator(input_img, quiet=True)
