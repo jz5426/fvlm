@@ -11,15 +11,21 @@ def process_image(loader, mask_path):
     try:
         phase = 'train' if 'train' in mask_path else 'valid'
 
-        mask_path = mask_path.replace(f"{phase}_mask", f"resized_{phase}_masks")
+        mask_path = mask_path.replace(
+            f"{phase}_mask", 
+            f"resized_{phase}_masks")
         img_path = mask_path.replace("masks", "images")
 
         if (
             Path(
-                img_path.replace(f"resized_{phase}_images", f"processed_{phase}_images")
+                img_path.replace(
+                    f"resized_{phase}_images", 
+                    f"processed_{phase}_images")
             ).exists()
             and Path(
-                mask_path.replace(f"resized_{phase}_masks", f"processed_{phase}_masks")
+                mask_path.replace(
+                    f"resized_{phase}_masks", 
+                    f"processed_{phase}_masks")
             ).exists()
         ):
             return None
@@ -108,16 +114,17 @@ def process_image(loader, mask_path):
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
+    # import argparse
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--split", required=False, default='train', type='str')
+    # args = parser.parse_args()
+    # split = args.split
+    # image_root = f"{split}_fix"
+    # mask_root = f"{split}_mask"
 
-    parser.add_argument("--split", required=False, default='train', type='str')
-    args = parser.parse_args()
-    
-    split = args.split
-
-    image_root = f"{split}_fix"
-    mask_root = f"{split}_mask"
+    split = 'train'
+    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
+    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 
     mask_paths = []
     for root, _, files in os.walk(mask_root):
@@ -134,9 +141,11 @@ if __name__ == "__main__":
             )
         ])
 
-    max_workers = 64
-    func = partial(process_image, loader)
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
-            pass
+    # max_workers = 32
+    # func = partial(process_image, loader)
+    # with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    #     for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
+    #         pass
+
+    process_image(loader, mask_paths[0])
     

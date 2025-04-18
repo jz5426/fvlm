@@ -13,10 +13,10 @@ def process(mask_path):
 
         # Step 1: Merge class
         relative_path = "/".join(mask_path.split("/")[-3:])
-        if Path(f"merged_{phase}_masks/" + relative_path).exists():
+        if Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/" + relative_path).exists(): # indicate processed
             return
 
-        Path(f"merged_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
 
         class_map = {
             1: "spleen",
@@ -163,20 +163,20 @@ def process(mask_path):
         fused_mask_sitk = sitk.GetImageFromArray(fused_mask)
         fused_mask_sitk.CopyInformation(mask_ct)
 
-        sitk.WriteImage(fused_mask_sitk, f"merged_{phase}_masks/{relative_path}")
+        sitk.WriteImage(fused_mask_sitk, f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/{relative_path}")
 
         # Step 2: Resize image and mask
         if (
-            Path(f"resized_{phase}_images/" + relative_path).exists()
-            and Path(f"resized_{phase}_masks/" + relative_path).exists()
+            Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).exists()
+            and Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).exists()
         ):
             return
-
-        Path(f"resized_{phase}_images/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(f"resized_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
+        # create the path directories without the filename
+        Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
 
         image_path = mask_path.replace(f"{phase}_mask", f"{phase}_fixed")
-        mask_path = mask_path.replace(f'{phase}_mask', f'merged_{phase}_masks')
+        mask_path = mask_path.replace(f'{phase}_mask', f'merged_{phase}_masks') # this is got from the above
 
         data = {"image": image_path, "label": mask_path}
         res = transforms.LoadImaged(keys=["image", "label"], image_only=False, ensure_channel_first=True)(data)
@@ -195,14 +195,14 @@ def process(mask_path):
                 transforms.Resized(spatial_size=target_size, keys=["image"], mode="trilinear"),
                 transforms.Resized(spatial_size=target_size, keys=["label"], mode="nearest"),
                 transforms.SaveImaged(
-                    output_dir=Path(f"resized_{phase}_images/" + relative_path).parent,
+                    output_dir=Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).parent,
                     keys=["image"],
                     output_postfix="",
                     separate_folder=False,
                     resample=False,
                 ),
                 transforms.SaveImaged(
-                    output_dir=Path(f"resized_{phase}_masks/" + relative_path).parent,
+                    output_dir=Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).parent,
                     keys=["label"],
                     output_postfix="",
                     separate_folder=False,
@@ -218,24 +218,27 @@ def process(mask_path):
 
 
 if "__main__" == __name__:
-    import argparse
-    parser = argparse.ArgumentParser()
+    # import argparse
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--split", required=False, default='train', type='str')
+    # args = parser.parse_args()
+    # split = args.split
+    # image_root = f"{split}_fix"
+    # mask_root = f"{split}_mask"
 
-    parser.add_argument("--split", required=False, default='train', type='str')
-    args = parser.parse_args()
-    
-    split = args.split
-
-    image_root = f'{split}_fix'
-    mask_root = f"{split}_mask"
+    split = 'train'
+    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
+    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 
     mask_paths = []
     for root, _, files in os.walk(mask_root):
         for file in files:
             mask_paths.append(os.path.join(root, file))
     
-    max_workers = 64
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
-            pass
+    # max_workers = 32
+    # with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    #     for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
+    #         pass
+
+    process(mask_paths[0])
     
