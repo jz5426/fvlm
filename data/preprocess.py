@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 def process_image(loader, mask_path):
     try:
-        phase = 'train' if 'train' in mask_path else 'valid'
+        phase = 'train' if 'train_mask' in mask_path else 'val'
 
         mask_path = mask_path.replace(
             f"{phase}_mask", 
@@ -105,9 +105,8 @@ def process_image(loader, mask_path):
                 ),
             ]
         )
-
         saver(data)
-    
+        print('processed')
     except Exception as e:
         print(e, img_path)
         return None
@@ -122,7 +121,7 @@ if __name__ == "__main__":
     # image_root = f"{split}_fix"
     # mask_root = f"{split}_mask"
 
-    split = 'train'
+    split = 'val'
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 
@@ -141,11 +140,11 @@ if __name__ == "__main__":
             )
         ])
 
-    # max_workers = 32
-    # func = partial(process_image, loader)
-    # with ProcessPoolExecutor(max_workers=max_workers) as executor:
-    #     for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
-    #         pass
+    max_workers = 8
+    func = partial(process_image, loader)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
+            pass
 
-    process_image(loader, mask_paths[0])
+    # process_image(loader, mask_paths[0])
     

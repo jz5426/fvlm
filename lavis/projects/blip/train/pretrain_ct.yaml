@@ -6,7 +6,7 @@
 model:
   arch: blip_pretrain_vit
 
-  model_type: fvlp
+  model_type: fvlp # configs/models/blip_pretrain_ct.yaml
   ckpt_path:
   load_pretrained: False
   load_finetuned: False
@@ -40,17 +40,18 @@ run:
 
   weight_decay: 0.05
   max_epoch: 20
-  batch_size_train: 14
-  batch_size_eval: 8
-  num_workers: 16
+  batch_size_train: 2
+  batch_size_eval: 2
+  num_workers: 1
   warmup_steps: 377
   log_freq: 1
 
   seed: 42
-  output_dir: "../multi-modal-results/pretrain_ckpts"
+  output_dir: "/cluster/projects/mcintoshgroup/fvlm_files/train_outputs"
 
   amp: False
-  resume_ckpt_path:
+  # best checkpoint path
+  resume_ckpt_path: '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'
 
   evaluate: False
   train_splits: ["train"]
@@ -58,4 +59,4 @@ run:
   device: "cuda"
   world_size: 1
   dist_url: "env://"
-  distributed: True
+  distributed: False

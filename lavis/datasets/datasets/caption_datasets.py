@@ -27,11 +27,11 @@ class __DisplMixin:
         )
 
 class CaptionDataset(BaseDataset, __DisplMixin):
-    def __init__(self, vis_processor, text_processor, vis_root, ann_paths):
+    def __init__(self, vis_processor, text_processor, vis_root, ann_paths, extension='.nii.gz'):
         super().__init__(vis_processor, text_processor, vis_root, ann_paths)
 
         self.vis_root = vis_root
-
+        self.extension = extension
         # vis_root = 'data/processed_train_images'
 
         # self.patient_paths = [
@@ -40,8 +40,28 @@ class CaptionDataset(BaseDataset, __DisplMixin):
         #     for f2 in os.listdir(os.path.join(vis_root, f1))
         # ]
 
-        patient_paths = np.load('/storage/guoruizhe/cache/hub/datasets--ibrahimhamamci--CT-RATE/ct_rate/patient_paths.npy')
+        # patient_paths = np.load('/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/patient_paths.npy') # has the resized image paths
+
+        # the following replace the original patient_paths implementation above
+        def _find_second_level_dirs(root_dir, substring=None):
+            second_level_dirs = []
+
+            for first_level in os.listdir(root_dir):
+                first_path = os.path.join(root_dir, first_level)
+                if os.path.isdir(first_path):
+                    for second_level in os.listdir(first_path):
+                        second_path = os.path.join(first_path, second_level)
+                        if os.path.isdir(second_path):
+                            if substring is None or substring in second_level:
+                                second_level_dirs.append(second_path)
+
+            return second_level_dirs
         
+        patient_paths = _find_second_level_dirs(
+            '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_train_images',
+            'train_'
+        )
+
         new_patient_paths = []
         for patient_path in patient_paths:
             new_patient_paths.append(patient_path.replace('resized_train_images', 'processed_train_images'))
@@ -57,12 +77,13 @@ class CaptionDataset(BaseDataset, __DisplMixin):
 
         self.organ_ratios = {k: 1 for k in self.organs}
 
-        desc_info = json.load(open('data/desc_info.json'))
-        conc_info = json.load(open('data/conc_info.json'))
+        desc_info = json.load(open('/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/desc_info.json'))
+        conc_info = json.load(open('/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/conc_info.json'))
 
         all_info = {}
         for patient_path in self.patient_paths:
-            patient = patient_path.split('/')[-1]
+            patient = patient_path.split('/')[-1] # the patient name like  "train_10a" or "train_10_a"
+            patient = self._handle_defected_patient_dir(patient) # handle the defected directory name case
 
             all_info[patient] = {}
             for organ in self.organs:
@@ -93,6 +114,14 @@ class CaptionDataset(BaseDataset, __DisplMixin):
 
         self.crop_size = (112, 256, 352)
 
+    def _handle_defected_patient_dir(self, patient):
+        """
+            from "train_10a" to "train_10_a" if neeeded 
+        """
+        if '_' not in patient.replace('train_', ''): # handle the defected case
+            patient = patient[:-1]+'_'+patient[-1]
+        return patient
+
     def __getitem__(self, index):
         exit = False
         while not exit:
@@ -102,6 +131,7 @@ class CaptionDataset(BaseDataset, __DisplMixin):
                 img_path = os.path.join(patient_path, random.choice(choices))
                 
                 patient_id = patient_path.split('/')[-1]
+                patient_id = self._handle_defected_patient_dir(patient_id)
 
                 mask_path = img_path.replace('images', 'masks')
 

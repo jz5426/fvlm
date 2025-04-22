@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 def process(mask_path):
     try:
-        phase = 'train' if 'train' in mask_path else 'valid'
+        phase = 'train' if 'train_mask' in mask_path else 'val'
 
         # Step 1: Merge class
         relative_path = "/".join(mask_path.split("/")[-3:])
@@ -226,7 +226,7 @@ if "__main__" == __name__:
     # image_root = f"{split}_fix"
     # mask_root = f"{split}_mask"
 
-    split = 'train'
+    split = 'val'
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 
@@ -235,10 +235,10 @@ if "__main__" == __name__:
         for file in files:
             mask_paths.append(os.path.join(root, file))
     
-    # max_workers = 32
-    # with ProcessPoolExecutor(max_workers=max_workers) as executor:
-    #     for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
-    #         pass
+    max_workers = 8
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
+            pass
 
-    process(mask_paths[0])
+    # process(mask_paths[0])
     

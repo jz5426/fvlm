@@ -51,7 +51,7 @@ class RunnerBase:
         self.config = cfg
         self.job_id = job_id
 
-        self.task = task
+        self.task = task # the job id
         self.datasets = datasets
 
         self._model = model
@@ -62,7 +62,7 @@ class RunnerBase:
         self._scaler = None
         self._dataloaders = None
         self._lr_sched = None
-
+        self._is_pretrained_checkpoint = False
         self.start_epoch = 0
 
         # self.setup_seeds()
@@ -336,7 +336,11 @@ class RunnerBase:
 
     @property
     def resume_ckpt_path(self):
-        return self.config.run_cfg.get("resume_ckpt_path", None)
+
+        ckpt = self.config.run_cfg.get("resume_ckpt_path", None)
+        if 'model.pth' == ckpt.split('/')[-1]:
+            self._is_pretrained_checkpoint = True
+        return ckpt
 
     @property
     def train_loader(self):
@@ -382,6 +386,8 @@ class RunnerBase:
                 #         model=self.unwrap_dist_model(self.model),
                 #         dataset=self.datasets["train"],
                 #     )
+
+                # wire back to the BaseTask class to run the training.
                 train_stats = self.train_epoch(cur_epoch)
                 self.log_stats(split_name="train", stats=train_stats, epoch=cur_epoch)
 
@@ -441,6 +447,7 @@ class RunnerBase:
         # train
         self.model.train()
 
+        # comes from the BaseTask
         return self.task.train_epoch(
             epoch=epoch,
             model=self.model,
@@ -624,7 +631,7 @@ class RunnerBase:
             model.load_state_dict(checkpoint["model"], strict=False)
         return model
 
-    def _load_checkpoint(self, url_or_filename):
+    def _load_checkpoint(self, url_or_filename, is_pretrained_weights=False):
         """
         Resume from a checkpoint.
         """
@@ -639,9 +646,18 @@ class RunnerBase:
             raise RuntimeError("checkpoint url or path is invalid")
 
         state_dict = checkpoint["model"]
-        self.unwrap_dist_model(self.model).load_state_dict(state_dict, strict=False)
+        load_result = self.unwrap_dist_model(self.model).load_state_dict(state_dict, strict=False)
 
-        self.optimizer.load_state_dict(checkpoint["optimizer"])
+        # load final checkpoint instead of ckpt saved from during learning.
+        if self._is_pretrained_checkpoint:
+            print('Loaded pretrained weights')
+            print("Missing keys from pretrained weights:", load_result.missing_keys)
+            print("Unexpected keys from pretrained weights:", load_result.unexpected_keys)
+            logging.info("Loaded pretrained weights from {}".format(url_or_filename))
+            return
+
+        if "optimizer" in checkpoint:
+            self.optimizer.load_state_dict(checkpoint["optimizer"])
         if self.scaler and "scaler" in checkpoint:
             self.scaler.load_state_dict(checkpoint["scaler"])
 

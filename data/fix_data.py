@@ -88,11 +88,12 @@ if __name__ == "__main__":
     # split = args.split
 
     split = 'train'
-    d = "validation" if split == "valid" else "train"
+    d = "validation" if split == "val" else "train"
     
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
-    metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv"))
-    rows = [row[1] for row in metadata.iterrows()]
+    # metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv")) # TODO: uncomment this when the val splits actually comes from the val_metadata
+    metadata = pd.read_csv(os.path.join(data_root, f"metadata/train_metadata.csv"))
+    rows = [row[1] for row in metadata.iterrows()][:50]
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         list(tqdm.tqdm(executor.map(process_row, rows), total=len(rows)))

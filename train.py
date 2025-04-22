@@ -62,6 +62,9 @@ def get_runner_class(cfg):
     """
     Get runner class from config. Default to epoch-based runner.
     """
+
+    # if runner field does not exists, it uses runner_base class.
+    # which has been registered.
     runner_cls = registry.get_runner_class(cfg.run_cfg.get("runner", "runner_base"))
 
     return runner_cls
@@ -85,14 +88,20 @@ def main():
 
     cfg.pretty_print()
 
+    # ImageTextPretrainTask
     task = tasks.setup_task(cfg)
 
+    # all comes from the baseclass of ImageTextPretrainTask.
     datasets = task.build_datasets(cfg)
     model = task.build_model(cfg)
 
-    runner = get_runner_class(cfg)(
-        cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets
-    )
+    # the following by default create the RunnerBase class.
+    runner_class = get_runner_class(cfg)
+    runner = runner_class(
+        cfg=cfg, task=task, model=model, datasets=datasets, job_id=job_id
+    ) # this is the RunnerBase class
+
+    # load the pretrained checkpoint before retraining.
     runner.train()
 
 

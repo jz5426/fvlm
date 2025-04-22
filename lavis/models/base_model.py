@@ -101,6 +101,8 @@ class BaseModel(nn.Module):
                 pretrain_path = cfg.get("pretrained", None)
                 assert "Found load_finetuned is False, but pretrain_path is None."
                 self.load_from_pretrained(url_or_filename=pretrain_path, **kwargs)
+            else:
+                print('Skipping load checkpiont')
 
     def before_training(self, **kwargs):
         pass

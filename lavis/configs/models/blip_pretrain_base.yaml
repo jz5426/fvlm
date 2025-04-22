@@ -6,9 +6,8 @@
 model:
   arch: blip_pretrain
 
-  load_pretrained: True
-  pretrained: "https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base_capfilt_large.pth"
-
+  load_pretrained: False # since we initialize from pretrained checkpoint
+  pretrained: "/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/model_base_capfilt_large.pth"
   # vit encoder
   vit_type: "base"
   vit_grad_ckpt: False
@@ -17,7 +16,7 @@ model:
   image_size: 224
   alpha: 0.4
 
-  # bert config
+  # bert config, this is most likely the one from https://github.dev/salesforce/LAVIS/tree/main/lavis/configs/models
   med_config_path: "configs/models/bert_config.json"
 
   embed_dim: 256

@@ -340,7 +340,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
         )
         
         ckpt = torch.load(
-            '/storage/guoruizhe/cache/hub/datasets--ibrahimhamamci--CT-RATE/code/mae_pretrain_vit_base.pth',
+            '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/ViT/mae_pretrain_vit_base.pth',
             map_location='cpu'
         )
 
@@ -358,10 +358,11 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 continue
 
             new_ckpt[key.replace('fc', 'linear').replace('proj', 'out_proj')] = value
-        model.load_state_dict(new_ckpt, strict=False)
+        load_result = model.load_state_dict(new_ckpt, strict=False)
+        print("Missing keys:", load_result.missing_keys)
+        print("Unexpected keys:", load_result.unexpected_keys)
 
         image_encoder = model
-
         text_encoder = XBertEncoder.from_config(cfg, from_pretrained=True)
         text_decoder = None
 
@@ -378,7 +379,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
             tie_enc_dec_weights=False,
             max_txt_len=max_txt_len
         )
-
+        # TODO: resolve here
         model.load_checkpoint_from_config(cfg)
 
         return model
