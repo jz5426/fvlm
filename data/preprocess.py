@@ -121,7 +121,7 @@ if __name__ == "__main__":
     # image_root = f"{split}_fix"
     # mask_root = f"{split}_mask"
 
-    split = 'val'
+    split = 'train'
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 
