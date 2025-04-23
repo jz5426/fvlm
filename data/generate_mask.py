@@ -25,6 +25,9 @@ def generate_mask(row):
     # skip the files if not exists in the data directory
     if not os.path.exists(filepath):
         return 
+    
+    if os.path.exists(os.path.join(dirpath, os.path.basename(filepath))):
+        return
 
     # NOTE: extension should be .nii.gz, not the h5 version.
     input_img = nib.load(filepath)
@@ -41,7 +44,7 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     # split = args.split
 
-    split = 'val'
+    split = 'train'
     d = "validation" if split == "val" else "train"
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
     # metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv")) # TODO: uncomment this when the val splits actually comes from the val_metadata

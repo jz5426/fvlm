@@ -102,6 +102,7 @@ def main():
     ) # this is the RunnerBase class
 
     # load the pretrained checkpoint before retraining.
+    # search _train_inner_loop function to see the training loop entry point
     runner.train()
 
 

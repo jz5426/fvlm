@@ -11,11 +11,12 @@ def process(mask_path):
     try:
         phase = 'train' if 'train_mask' in mask_path else 'val'
 
-        # Step 1: Merge class
+        # Step 1: check if merged masks exists
         relative_path = "/".join(mask_path.split("/")[-3:])
-        if Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/" + relative_path).exists(): # indicate processed
-            return
+        # if Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/" + relative_path).exists(): # indicate processed
+        #     return
 
+        # create the merged mask directory
         Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
 
         class_map = {
@@ -152,7 +153,8 @@ def process(mask_path):
 
         mask_ct = sitk.ReadImage(mask_path)
         mask = sitk.GetArrayFromImage(mask_ct)
-
+        
+        # merging the mask values
         fused_mask = np.zeros_like(mask)
         for original_id, organ_name in class_map.items():
             if organ_name not in merged_organ_id:
@@ -166,11 +168,11 @@ def process(mask_path):
         sitk.WriteImage(fused_mask_sitk, f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/{relative_path}")
 
         # Step 2: Resize image and mask
-        if (
-            Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).exists()
-            and Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).exists()
-        ):
-            return
+        # if (
+        #     Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).exists()
+        #     and Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).exists()
+        # ):
+        #     return
         # create the path directories without the filename
         Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
         Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
@@ -214,7 +216,7 @@ def process(mask_path):
         trans(res)
 
     except Exception as e:
-        print(mask_path, e)
+        print("ERROR: ", mask_path, e)
 
 
 if "__main__" == __name__:

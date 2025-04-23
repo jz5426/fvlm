@@ -27,10 +27,18 @@ def process_image(loader, mask_path):
                     f"resized_{phase}_masks", 
                     f"processed_{phase}_masks")
             ).exists()
-        ):
+        ): 
+            # print('Skipping ', img_path)
             return None
-
-        data = loader({"image": img_path, "label": mask_path})
+        
+        trans_input = {"image": img_path, "label": mask_path}
+        # load = transforms.LoadImaged(keys=["image", "label"], image_only=True, ensure_channel_first=True)
+        # transpose = transforms.Transposed(keys=["image", "label"], indices=(0, 3, 2, 1))
+        # scaleIntensity = transforms.ScaleIntensityRanged(
+        #     keys=["image"], a_min=-1150, a_max=350,
+        #     b_min=0.0, b_max=1.0, clip=True
+        # )
+        data = loader(trans_input)
 
         image = data["image"]
         label = data["label"]
@@ -106,9 +114,9 @@ def process_image(loader, mask_path):
             ]
         )
         saver(data)
-        print('processed')
+        print('Saved ', img_path.replace(f"resized_{phase}_images", f"processed_{phase}_images"))
     except Exception as e:
-        print(e, img_path)
+        print('Error', e, img_path)
         return None
 
 
@@ -121,7 +129,7 @@ if __name__ == "__main__":
     # image_root = f"{split}_fix"
     # mask_root = f"{split}_mask"
 
-    split = 'train'
+    split = 'val'
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 

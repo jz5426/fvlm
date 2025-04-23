@@ -28,11 +28,12 @@ def process_row(row):
     dirpath = os.path.dirname(filepath)
     dirpath = dirpath.replace(f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}/", f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed/")
 
-    # skip the files if not exists in the data directory
+    # skip the file from csv if not exists in the data directory
     if not os.path.exists(filepath):
+        print('Skipping ', filepath)
         return 
 
-    if os.path.exists(os.path.join(dirpath, os.path.basename(filepath))):
+    if os.path.exists(os.path.join(dirpath, os.path.basename(filepath).replace('.h5', '.nii.gz'))):
         return
 
     # Read Image
@@ -74,7 +75,7 @@ def process_row(row):
     base += '.nii.gz'
     # np.transpose(np_image_transposed, (1, 2, 0)) # reverse the previous transpose operation
     sitk.WriteImage(adjusted_hu, os.path.join(dirpath, os.path.basename(base)))
-
+    print('finish processing ', os.path.join(dirpath, os.path.basename(base)))
 
 if __name__ == "__main__":
 
