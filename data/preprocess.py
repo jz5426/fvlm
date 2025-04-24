@@ -195,11 +195,12 @@ if __name__ == "__main__":
 
     process_image(loader, mask_paths[0])
 
-    # remove the unnecessary directories
+    # remove the resized_image directory
     if os.path.isdir(image_root) and count_files_with_suffix(image_root, '.nii.gz') == 0:
         shutil.rmtree(image_root)
         print(f"{image_root} removed.")
 
+    # remove the resized_mask directory
     if os.path.isdir(mask_root) and count_files_with_suffix(mask_root, '.nii.gz') == 0:
         shutil.rmtree(mask_root)
         print(f"{mask_root} removed.")

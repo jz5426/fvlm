@@ -53,7 +53,7 @@ if __name__ == "__main__":
     # metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv")) # TODO: uncomment this when the val splits actually comes from the val_metadata
     metadata = pd.read_csv(os.path.join(data_root, f"metadata/train_metadata.csv"))
 
-    rows = [row[1] for row in metadata.iterrows()][:50]
+    rows = [row[1] for row in metadata.iterrows()]
     for row in rows:
         generate_mask(row)
     

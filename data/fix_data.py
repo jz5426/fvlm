@@ -94,7 +94,7 @@ if __name__ == "__main__":
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
     # metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv")) # TODO: uncomment this when the val splits actually comes from the val_metadata
     metadata = pd.read_csv(os.path.join(data_root, f"metadata/train_metadata.csv"))
-    rows = [row[1] for row in metadata.iterrows()][:50]
+    rows = [row[1] for row in metadata.iterrows()]
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         list(tqdm.tqdm(executor.map(process_row, rows), total=len(rows)))
