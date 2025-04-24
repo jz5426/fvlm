@@ -201,14 +201,14 @@ def process(mask_path):
                     keys=["image"],
                     output_postfix="",
                     separate_folder=False,
-                    resample=False,
+                    resample=False
                 ),
                 transforms.SaveImaged(
                     output_dir=Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).parent,
                     keys=["label"],
                     output_postfix="",
                     separate_folder=False,
-                    resample=False,
+                    resample=False
                 ),
             ]
         )

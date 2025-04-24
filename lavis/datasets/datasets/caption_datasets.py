@@ -61,12 +61,11 @@ class CaptionDataset(BaseDataset, __DisplMixin):
             '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_train_images',
             'train_'
         )
-
         new_patient_paths = []
         for patient_path in patient_paths:
             new_patient_paths.append(patient_path.replace('resized_train_images', 'processed_train_images'))
         self.patient_paths = new_patient_paths
-
+        # NOTE: the actual ones used are the preprocessed ones and the masks, but need the resized_train_images directory to collect the paths => should be numpy
         self.organs = [
             'lung', 'heart', 'esophagus', 'aorta'
         ]

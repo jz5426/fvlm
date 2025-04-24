@@ -117,6 +117,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
         return min(1, (epoch * num_iters_per_epoch + iters) / (2 * num_iters_per_epoch))
 
     def forward(self, samples):
+        #NOTE: main forward function
         image = samples["image"]
         seg = samples["seg"]
 

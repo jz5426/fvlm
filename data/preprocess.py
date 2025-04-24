@@ -98,6 +98,7 @@ def process_image(loader, mask_path):
                     output_postfix="",
                     separate_folder=False,
                     resample=False,
+                    output_dtype=np.float16 # TODO: make sure that with sangwook of the right datatype for space shrinking
                 ),
                 transforms.SaveImaged(
                     output_dir=str(
@@ -110,6 +111,7 @@ def process_image(loader, mask_path):
                     output_postfix="",
                     separate_folder=False,
                     resample=False,
+                    output_dtype=np.float16 # TODO: make sure that with sangwook of the right datatype for space shrinking
                 ),
             ]
         )

@@ -92,6 +92,7 @@ def main():
     task = tasks.setup_task(cfg)
 
     # all comes from the baseclass of ImageTextPretrainTask.
+    # from the CaptionDataset class
     datasets = task.build_datasets(cfg) # from BaseTask
     model = task.build_model(cfg)
 
@@ -102,8 +103,11 @@ def main():
     ) # this is the RunnerBase class
 
     # load the pretrained checkpoint before retraining.
-    # search _train_inner_loop function to see the training loop entry point
+    # search _train_inner_loop function to see the training loop entry point from the base_task.py
     # check RunnerBase.train method for the evaluation during epoch training.
+
+    # forward of the model refers to BlipPretrain from lavis (should be)
+    # search the tag :main forward function
     runner.train()
 
 

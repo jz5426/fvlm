@@ -61,6 +61,7 @@ class BaseTask:
         return datasets
 
     def train_step(self, model, samples):
+        # forward of the model refers to BlipPretrain from lavis (should be)
         output = model(samples)
         loss_dict = {}
         for k,v in output.items():
