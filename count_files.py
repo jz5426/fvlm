@@ -5,16 +5,36 @@ def count_files_with_suffix(directory, suffix):
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith(suffix):
+                # print(file)
                 count += 1
     return count
 
-image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_train_fix/'
-mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_train_mask/'
-file_suffix = ".nii.gz"  # or ".txt", "_mask.nii.gz", etc.
-num_files = count_files_with_suffix(image_root, file_suffix)
-print(f"Number of files ending with '{file_suffix}': {num_files}") # make sense
-num_files = count_files_with_suffix(mask_root, file_suffix)
-print(f"Number of files ending with '{file_suffix}': {num_files}") # make sense
+def get_directory_size_in_gb(directory):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            if os.path.isfile(filepath):
+                total_size += os.path.getsize(filepath)
+    size_gb = total_size / (1024 ** 3)  # Convert bytes to GB
+    return size_gb
+
+
+#%% find the size of the directory
+# Example usage:
+directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_train_images"
+size_gb = get_directory_size_in_gb(directory_path)
+print(f"Directory size: {size_gb:.2f} GB")
+
+#%% find the number of files in the directory
+
+# image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_train_fix/'
+# mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_train_mask/'
+# file_suffix = ".nii.gz"  # or ".txt", "_mask.nii.gz", etc.
+# num_files = count_files_with_suffix(image_root, file_suffix)
+# print(f"Number of files ending with '{file_suffix}': {num_files}") # make sense
+# num_files = count_files_with_suffix(mask_root, file_suffix)
+# print(f"Number of files ending with '{file_suffix}': {num_files}") # make sense
 
 # # Example usage:
 # directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_val"
@@ -37,22 +57,22 @@ print(f"Number of files ending with '{file_suffix}': {num_files}") # make sense
 # num_files = count_files_with_suffix(directory_path, file_suffix)
 # print(f"Number of files ending with '{file_suffix}': {num_files} [MERGED MASK]")
 
-# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_val_images"
+# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_train_images"
 # file_suffix = ".nii.gz"  # or ".txt", "_mask.nii.gz", etc.
 # num_files = count_files_with_suffix(directory_path, file_suffix)
 # print(f"Number of files ending with '{file_suffix}': {num_files} [RESIZED TRAIN IMAGE]")
 
-# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_val_masks"
+# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_train_masks"
 # file_suffix = ".nii.gz"  # or ".txt", "_mask.nii.gz", etc.
 # num_files = count_files_with_suffix(directory_path, file_suffix)
 # print(f"Number of files ending with '{file_suffix}': {num_files} [RESIZED TRAIN MASK]")
 
-# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_val_images"
+# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_train_images"
 # file_suffix = ".nii.gz"  # or ".txt", "_mask.nii.gz", etc.
 # num_files = count_files_with_suffix(directory_path, file_suffix)
 # print(f"Number of files ending with '{file_suffix}': {num_files} [PROCESSED TRAIN IMAGE]")
 
-# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_val_masks"
+# directory_path = "/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_train_masks"
 # file_suffix = ".nii.gz"  # or ".txt", "_mask.nii.gz", etc.
 # num_files = count_files_with_suffix(directory_path, file_suffix)
 # print(f"Number of files ending with '{file_suffix}': {num_files} [PROCESSED TRAIN MASK]")

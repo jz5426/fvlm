@@ -99,4 +99,5 @@ if __name__ == "__main__":
     with concurrent.futures.ThreadPoolExecutor() as executor:
         list(tqdm.tqdm(executor.map(process_row, rows), total=len(rows)))
     # process_row(rows[0])
-    print('finished')
+
+    print('finished fix_data.py script')

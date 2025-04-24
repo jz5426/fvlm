@@ -56,3 +56,6 @@ if __name__ == "__main__":
     rows = [row[1] for row in metadata.iterrows()][:50]
     for row in rows:
         generate_mask(row)
+    
+    print('finished generate_mask.py script')
+

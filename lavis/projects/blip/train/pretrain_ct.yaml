@@ -51,7 +51,7 @@ run:
 
   amp: False
   # best checkpoint path
-  resume_ckpt_path: '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'
+  # resume_ckpt_path: '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'
 
 
   evaluate: False

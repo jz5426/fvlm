@@ -6,9 +6,14 @@ import os
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
+import shutil
+
+from count_files import count_files_with_suffix
 
 def process_image(loader, mask_path):
     # mask_path is resized_{phrase}_images
+    original_mask_path = mask_path
+    img_path = None
     try:
         phase = 'train' if 'train_mask' in mask_path else 'val'
 
@@ -17,20 +22,20 @@ def process_image(loader, mask_path):
         #     f"resized_{phase}_masks")
         img_path = mask_path.replace("masks", "images") # resized_{phrase}_images
 
-        if (
-            Path(
-                img_path.replace(
-                    f"resized_{phase}_images", 
-                    f"processed_{phase}_images")
-            ).exists()
-            and Path(
-                mask_path.replace(
-                    f"resized_{phase}_masks", 
-                    f"processed_{phase}_masks")
-            ).exists()
-        ): 
-            # print('Skipping ', img_path)
-            return None
+        # if (
+        #     Path(
+        #         img_path.replace(
+        #             f"resized_{phase}_images", 
+        #             f"processed_{phase}_images")
+        #     ).exists()
+        #     and Path(
+        #         mask_path.replace(
+        #             f"resized_{phase}_masks", 
+        #             f"processed_{phase}_masks")
+        #     ).exists()
+        # ): 
+        #     # print('Skipping ', img_path)
+        #     return None
         
         trans_input = {"image": img_path, "label": mask_path}
         # load = transforms.LoadImaged(keys=["image", "label"], image_only=True, ensure_channel_first=True)
@@ -99,7 +104,7 @@ def process_image(loader, mask_path):
                     output_postfix="",
                     separate_folder=False,
                     resample=False,
-                    output_dtype=np.float16 # TODO: make sure that with sangwook of the right datatype for space shrinking
+                    dtype=np.float16 # TODO: make sure that with sangwook of the right datatype for space shrinking
                 ),
                 transforms.SaveImaged(
                     output_dir=str(
@@ -112,16 +117,43 @@ def process_image(loader, mask_path):
                     output_postfix="",
                     separate_folder=False,
                     resample=False,
-                    output_dtype=np.float16 # TODO: make sure that with sangwook of the right datatype for space shrinking
                 ),
             ]
         )
         saver(data)
-        print('Saved ', img_path.replace(f"resized_{phase}_images", f"processed_{phase}_images"))
     except Exception as e:
         print('Error', e, img_path)
-        return None
+        return
 
+    # remove the mask from the resized_mask folder if successfully preprocessed.
+    if os.path.isfile(original_mask_path):
+        os.remove(original_mask_path)
+        print(f"Removed image mask file {original_mask_path} from resized_mask_path folder")
+    else:
+        print(f"image mask file {original_mask_path} does not exist.")
+
+
+    # remove the image from the resized_mask folder if successfully preprocessed.
+    if os.path.isfile(img_path):
+        os.remove(img_path)
+        print(f"Removed image file {img_path} from resized_image_path folder")
+    else:
+        print(f"image file {img_path} does not exist.")
+
+# the following replace the original patient_paths implementation above
+def _find_second_level_dirs(root_dir, substring=None):
+    second_level_dirs = []
+
+    for first_level in os.listdir(root_dir):
+        first_path = os.path.join(root_dir, first_level)
+        if os.path.isdir(first_path):
+            for second_level in os.listdir(first_path):
+                second_path = os.path.join(first_path, second_level)
+                if os.path.isdir(second_path):
+                    if substring is None or substring in second_level:
+                        second_level_dirs.append(second_path)
+
+    return second_level_dirs
 
 if __name__ == "__main__":
     # import argparse
@@ -135,7 +167,10 @@ if __name__ == "__main__":
     # NOTE: depends on the resized_{phrase}_images and resized_{phrase}_masks data
 
     split = 'train'
-    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_mask/'
+    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_masks/'    
+    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_images/'
+    # patient_paths = _find_second_level_dirs(image_root, 'train_')
+    # np.save("/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/patient_paths.npy", np.array(patient_paths))
 
     mask_paths = []
     for root, _, files in os.walk(mask_root):
@@ -158,14 +193,16 @@ if __name__ == "__main__":
         for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
             pass
 
-    # process_image(loader, mask_paths[0])
+    process_image(loader, mask_paths[0])
 
     # remove the unnecessary directories
-    # if os.path.isdir(image_root):
-    #     os.rmdir(image_root)
-    #     print(f"{image_root} removed.")
+    if os.path.isdir(image_root) and count_files_with_suffix(image_root, '.nii.gz') == 0:
+        shutil.rmtree(image_root)
+        print(f"{image_root} removed.")
 
-    # if os.path.isdir(mask_root):
-    #     os.rmdir(mask_root)
-    #     print(f"{mask_root} removed.")
+    if os.path.isdir(mask_root) and count_files_with_suffix(mask_root, '.nii.gz') == 0:
+        shutil.rmtree(mask_root)
+        print(f"{mask_root} removed.")
+    
+    print('finished preprocess.py script')
     

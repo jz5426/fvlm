@@ -42,6 +42,11 @@ class CaptionDataset(BaseDataset, __DisplMixin):
 
         # patient_paths = np.load('/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/patient_paths.npy') # has the resized image paths
 
+        # new_patient_paths = []
+        # for patient_path in patient_paths:
+        #     new_patient_paths.append(patient_path.replace('resized_train_images', 'processed_train_images'))
+        # self.patient_paths = new_patient_paths
+
         # the following replace the original patient_paths implementation above
         def _find_second_level_dirs(root_dir, substring=None):
             second_level_dirs = []
@@ -56,15 +61,11 @@ class CaptionDataset(BaseDataset, __DisplMixin):
                                 second_level_dirs.append(second_path)
 
             return second_level_dirs
-        
-        patient_paths = _find_second_level_dirs(
-            '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_train_images',
+
+        self.patient_paths = _find_second_level_dirs(
+            '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_train_images',
             'train_'
         )
-        new_patient_paths = []
-        for patient_path in patient_paths:
-            new_patient_paths.append(patient_path.replace('resized_train_images', 'processed_train_images'))
-        self.patient_paths = new_patient_paths
 
         # NOTE: the actual ones used are the preprocessed ones and the masks, but need the resized_train_images directory to collect the paths => should be numpy
         self.organs = [
