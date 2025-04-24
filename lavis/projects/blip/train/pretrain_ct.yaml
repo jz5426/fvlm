@@ -19,7 +19,7 @@ model:
   alpha: 0.5
 
 datasets:
-  coco_caption:
+  coco_caption: # this is used for process the ct-rate data, encapsulated in the coco caption format
     vis_processor:
         train:
           name: "blip_image_train"
@@ -53,8 +53,10 @@ run:
   # best checkpoint path
   resume_ckpt_path: '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'
 
+
   evaluate: False
   train_splits: ["train"]
+  # NOTE there is no evaluation split. use the eval script to do the evaluation
 
   device: "cuda"
   world_size: 1

@@ -338,8 +338,10 @@ class RunnerBase:
     def resume_ckpt_path(self):
 
         ckpt = self.config.run_cfg.get("resume_ckpt_path", None)
-        if 'model.pth' == ckpt.split('/')[-1]:
+        if ckpt and 'model.pth' == ckpt.split('/')[-1]:
             self._is_pretrained_checkpoint = True
+        else:
+            print('starts from scratch')
         return ckpt
 
     @property

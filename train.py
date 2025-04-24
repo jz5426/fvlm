@@ -92,7 +92,7 @@ def main():
     task = tasks.setup_task(cfg)
 
     # all comes from the baseclass of ImageTextPretrainTask.
-    datasets = task.build_datasets(cfg)
+    datasets = task.build_datasets(cfg) # from BaseTask
     model = task.build_model(cfg)
 
     # the following by default create the RunnerBase class.
@@ -103,6 +103,7 @@ def main():
 
     # load the pretrained checkpoint before retraining.
     # search _train_inner_loop function to see the training loop entry point
+    # check RunnerBase.train method for the evaluation during epoch training.
     runner.train()
 
 
