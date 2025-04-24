@@ -8,13 +8,14 @@ from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 
 def process_image(loader, mask_path):
+    # mask_path is resized_{phrase}_images
     try:
         phase = 'train' if 'train_mask' in mask_path else 'val'
 
-        mask_path = mask_path.replace(
-            f"{phase}_mask", 
-            f"resized_{phase}_masks")
-        img_path = mask_path.replace("masks", "images")
+        # mask_path = mask_path.replace(
+        #     f"{phase}_mask", 
+        #     f"resized_{phase}_masks")
+        img_path = mask_path.replace("masks", "images") # resized_{phrase}_images
 
         if (
             Path(
@@ -131,9 +132,10 @@ if __name__ == "__main__":
     # image_root = f"{split}_fix"
     # mask_root = f"{split}_mask"
 
-    split = 'val'
-    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fix'
-    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
+    # NOTE: depends on the resized_{phrase}_images and resized_{phrase}_masks data
+
+    split = 'train'
+    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_mask/'
 
     mask_paths = []
     for root, _, files in os.walk(mask_root):
@@ -157,4 +159,13 @@ if __name__ == "__main__":
             pass
 
     # process_image(loader, mask_paths[0])
+
+    # remove the unnecessary directories
+    # if os.path.isdir(image_root):
+    #     os.rmdir(image_root)
+    #     print(f"{image_root} removed.")
+
+    # if os.path.isdir(mask_root):
+    #     os.rmdir(mask_root)
+    #     print(f"{mask_root} removed.")
     

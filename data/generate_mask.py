@@ -35,6 +35,7 @@ def generate_mask(row):
 
     Path(dirpath).mkdir(parents=True, exist_ok=True)
     nib.save(output_img, os.path.join(dirpath, os.path.basename(filepath)))
+    print(f'finish processing {os.path.join(dirpath, os.path.basename(filepath))}')
 
 
 if __name__ == "__main__":
@@ -43,6 +44,8 @@ if __name__ == "__main__":
     # parser.add_argument("--split", required=False, default='train', type='str')
     # args = parser.parse_args()
     # split = args.split
+
+    #NOTE: depends on the _fix data
 
     split = 'train'
     d = "validation" if split == "val" else "train"

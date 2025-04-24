@@ -65,6 +65,7 @@ class CaptionDataset(BaseDataset, __DisplMixin):
         for patient_path in patient_paths:
             new_patient_paths.append(patient_path.replace('resized_train_images', 'processed_train_images'))
         self.patient_paths = new_patient_paths
+
         # NOTE: the actual ones used are the preprocessed ones and the masks, but need the resized_train_images directory to collect the paths => should be numpy
         self.organs = [
             'lung', 'heart', 'esophagus', 'aorta'
