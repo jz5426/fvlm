@@ -25,7 +25,7 @@ def generate_mask(row):
     # skip the files if not exists in the data directory
     if not os.path.exists(filepath):
         return 
-    
+    # check if the file is preprocessed already
     if os.path.exists(os.path.join(dirpath, os.path.basename(filepath))):
         return
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     #NOTE: depends on the _fix data
 
-    split = 'train'
+    split = 'val'
     d = "validation" if split == "val" else "train"
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
     # metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv")) # TODO: uncomment this when the val splits actually comes from the val_metadata
@@ -56,6 +56,6 @@ if __name__ == "__main__":
     rows = [row[1] for row in metadata.iterrows()]
     for row in rows:
         generate_mask(row)
-    
+    # generate_mask(rows[0])
     print('finished generate_mask.py script')
 

@@ -8,7 +8,14 @@ import SimpleITK as sitk
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 
-from count_files import count_files_with_suffix
+def count_files_with_suffix(directory, suffix):
+    count = 0
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith(suffix):
+                # print(file)
+                count += 1
+    return count
 
 def process(mask_path):
     original_mask_path = mask_path
@@ -16,8 +23,16 @@ def process(mask_path):
     try:
         phase = 'train' if 'train_mask' in mask_path else 'val'
 
+        # check if the file is preprocessed.
+
         # Step 1: check if merged masks exists
         relative_path = "/".join(mask_path.split("/")[-3:])
+        processed_image_path = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path
+        processed_mask_path = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path
+
+        # if Path(processed_image_path).exists() and Path(processed_mask_path).exists():
+        #     return
+
         # if Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/" + relative_path).exists(): # indicate processed
         #     return
 
@@ -172,7 +187,7 @@ def process(mask_path):
 
         sitk.WriteImage(fused_mask_sitk, f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_merged_{phase}_masks/{relative_path}")
 
-        # Step 2: Resize image and mask
+        # # Step 2: Resize image and mask
         # if (
         #     Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).exists()
         #     and Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).exists()
@@ -180,8 +195,8 @@ def process(mask_path):
         #     return
 
         # create the path directories without the filename
-        Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_images/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(processed_image_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(processed_mask_path).parent.mkdir(parents=True, exist_ok=True)
 
         image_path = mask_path.replace(f"{phase}_mask", f"{phase}_fixed")
         mask_path = mask_path.replace(f'{phase}_mask', f'merged_{phase}_masks') # from here it uses the merged mask
@@ -228,14 +243,14 @@ def process(mask_path):
         return
 
     # remove the image from the _fixed folder if successfully resized.
-    if os.path.isfile(image_path):
+    if image_path and os.path.isfile(image_path):
         os.remove(image_path)
         print(f"Removed image file {image_path} from _fixed folder")
     else:
         print(f"image file {image_path} does not exist.")
 
     # remove the mask from the _mask folder if successfully resized.
-    if os.path.isfile(original_mask_path):
+    if original_mask_path and os.path.isfile(original_mask_path):
         os.remove(original_mask_path)
         print(f"Removed image mask file {original_mask_path} from _mask_path folder")
     else:
@@ -249,7 +264,6 @@ def process(mask_path):
     else:
         print(f"image merged mask file {merged_mask} does not exist.")
     
-
 if "__main__" == __name__:
     # import argparse
     # parser = argparse.ArgumentParser()
@@ -261,7 +275,7 @@ if "__main__" == __name__:
 
     #NOTE: depends on the _fix and _mask data
 
-    split = 'train'
+    split = 'val'
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/'
 
@@ -270,11 +284,14 @@ if "__main__" == __name__:
         for file in files:
             mask_paths.append(os.path.join(root, file))
     
-    max_workers = 8
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
-            pass
-    
+    # max_workers = 10
+    # with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    #     for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
+    #         pass
+
+    for mask_path in mask_paths:
+        process(mask_path)
+
     ## remove empty directories
 
     # remove the _fixed image directory

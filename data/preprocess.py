@@ -8,7 +8,14 @@ from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 import shutil
 
-from count_files import count_files_with_suffix
+def count_files_with_suffix(directory, suffix):
+    count = 0
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith(suffix):
+                # print(file)
+                count += 1
+    return count
 
 def process_image(loader, mask_path):
     # mask_path is resized_{phrase}_images
@@ -166,7 +173,7 @@ if __name__ == "__main__":
 
     # NOTE: depends on the resized_{phrase}_images and resized_{phrase}_masks data
 
-    split = 'train'
+    split = 'val'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_masks/'    
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_images/'
     # patient_paths = _find_second_level_dirs(image_root, 'train_')
@@ -193,7 +200,7 @@ if __name__ == "__main__":
         for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
             pass
 
-    process_image(loader, mask_paths[0])
+    # process_image(loader, mask_paths[0])
 
     # remove the resized_image directory
     if os.path.isdir(image_root) and count_files_with_suffix(image_root, '.nii.gz') == 0:

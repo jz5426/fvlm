@@ -28,9 +28,9 @@ def process_row(row):
     dirpath = os.path.dirname(filepath)
     dirpath = dirpath.replace(f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}/", f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed/")
 
-    # skip the file from csv if not exists in the data directory
+    # skip the file from csv if not exists in the data directory (intentional)
     if not os.path.exists(filepath):
-        print('Skipping ', filepath)
+        print('File not exists in the given directory => Skipping ', filepath)
         return 
 
     if os.path.exists(os.path.join(dirpath, os.path.basename(filepath).replace('.h5', '.nii.gz'))):
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     # split = args.split
 
-    split = 'train'
+    split = 'val'
     d = "validation" if split == "val" else "train"
     
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
