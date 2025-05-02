@@ -167,6 +167,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 
                 # seg[i] == organ_id + 1 gives True at voxels belonging to that organ.
                 # gives [num_intact_organs, D, H, W], DHW comes from seg 3d mask, seg[i] is the segmentation mask for batch item i
+                # this is already binary mask for each organ.
                 masks = torch.stack(
                     [torch.eq(seg[i], organ_id + 1) for organ_id in inds], dim=0).float()
 
@@ -175,7 +176,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 # => [num_intact_organs, D', H', W'], where D' x H' x W' = L, the number of patch tokens
                 downsampled_masks = F.max_pool3d(
                     masks.unsqueeze(1),
-                    kernel_size=(16, 16, 32),
+                    kernel_size=(16, 16, 32), # 16 by 16 word for each image remember?
                     stride=(16, 16, 32)
                 )
                 
@@ -208,9 +209,11 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
 
             template = f'{organ_name} shows no significant abnormalities.'
 
-            # patient id withint the batch
+            # patient id within the batch that has organ mask
             cl_patient_ids = torch.where(organ_mask_flags[:, cl_organ_id])[0]
 
+            # account for the fact that some GPU might not see the same organ in their subset of inputs
+            # Empty tensors do not contribute to the loss in your setup.
             if not len(cl_patient_ids):
                 image_feat = torch.empty(0, 256, dtype=torch.float).to(image.device)
                 text_feat = torch.empty(0, 256, dtype=torch.float).to(image.device)
@@ -221,8 +224,9 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 # image_feat = self.get_roi_features(image_embeds, organ_token_flags, cl_patient_ids, cl_organ_id)
                 image_feat = self.get_roi_features(
                     hidden_image_embeds, 
-                    organ_token_flags,
-                    cl_patient_ids, cl_organ_id
+                    organ_token_flags, # a vector form mask for each organ in each instance of the batch
+                    cl_patient_ids, 
+                    cl_organ_id
                 )
                 image_feat = self.vision_projs[cl_organ_id](image_feat)
                 image_feat = F.normalize(image_feat, dim=-1)

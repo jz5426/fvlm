@@ -118,17 +118,26 @@ def center_crop(image, mask, crop_size):
     return image[..., z_start:z_end, y_start:y_end, x_start:x_end], mask[..., z_start:z_end, y_start:y_end, x_start:x_end]
 
 class DataFolder(Dataset):
-    def __init__(self):
+    def __init__(self, report_file, label_file, file_extension='.nii.gz'):
         super().__init__()
 
         vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_val_images'
-
+        self.file_extension = file_extension
         img_paths = []
         for root, _, files in os.walk(vis_root):
             for file in files:
-                if file.endswith('.nii.gz'):
+                if file.endswith(file_extension):
                     img_paths.append(os.path.join(root, file))
         self.img_paths = img_paths
+        
+        assert label_file is not None
+        assert report_file is not None
+        self.report_file = report_file
+        self.label_df = pd.read_csv(label_file)
+        label_cols = list(self.label_df.columns[1:])
+        self.label_df['one_hot_labels'] = list(self.label_df[label_cols].values)
+        self.accession_to_text = self.load_accession_text(report_file)   
+        self.image_labels = self.prepare_image_labels()
 
         self.organs = [
             'lung', 'heart', 'esophagus', 'aorta'
@@ -166,6 +175,42 @@ class DataFolder(Dataset):
         if dist.is_initialized():
             self.img_paths = self.img_paths[dist.get_rank()::dist.get_world_size()]
 
+    def load_accession_text(self, report_file):
+        df = pd.read_csv(report_file)
+        accession_to_text = {}
+        for index, row in df.iterrows():
+            accession_to_text[row['VolumeName']] = row["Findings_EN"],row['Impressions_EN']
+        return accession_to_text
+
+    def prepare_image_labels(self):
+        image_labels = []
+        for nii_file in self.img_paths:
+            accession_number = nii_file.split("/")[-1]
+            accession_number = accession_number.replace(f"{self.file_extension}", ".nii.gz")
+
+            # make sure the vol has the corresponding reports
+            if accession_number not in self.accession_to_text:
+                continue
+
+            impression_text = self.accession_to_text[accession_number]
+
+            if impression_text == "Not given.":
+                impression_text=""
+
+            input_text_concat = ""
+            for text in impression_text:
+                input_text_concat = input_text_concat + str(text)
+            input_text_concat = impression_text[0]
+
+            onehotlabels = self.label_df[self.label_df["VolumeName"] == accession_number]["one_hot_labels"].values
+            # skip the ones without labels
+            if len(onehotlabels) == 0:
+                assert False
+
+            image_labels.append(onehotlabels[0])
+
+        return image_labels
+
     @staticmethod
     def get_patient_id(image_path):
         img_name = image_path.split('/')[-1]
@@ -191,7 +236,8 @@ class DataFolder(Dataset):
         meta_info = {
             'file_name': file_name,
             'img_path': image_path,
-            'test_organ_names': test_organ_names
+            'test_organ_names': test_organ_names,
+            'disease_labels': self.image_labels[index]
         }
         
         return data['image'].as_tensor(), data['label'].as_tensor(), test_items, meta_info
@@ -220,7 +266,11 @@ def evaluate():
     init_distributed_mode(cfg.run_cfg)
 
     # validation dataset
-    datafolder = DataFolder()
+    # TODO: supposed to be the report and labels file for val split but for the testing, our val split comes from the train split.
+    datafolder = DataFolder(
+        report_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/radiology_text_reports/train_reports.csv',
+        label_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/dataset_multi_abnormality_labels_train_predicted_labels.csv' 
+    )
     dataloader = DataLoader(
         datafolder,
         batch_size=1,
@@ -248,7 +298,7 @@ def evaluate():
     #     config='/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized/config.json', 
     # )
 
-    for epoch in range(10, 20):
+    for epoch in range(90, 95):
         print(f'Epoch: {epoch}')
 
         ckpt_path = f'/cluster/projects/mcintoshgroup/fvlm_files/train_outputs/20250428132/checkpoint_{epoch}.pth'
@@ -283,6 +333,8 @@ def evaluate():
 
         for i, (image, mask, test_items, meta_info) in enumerate(tqdm(dataloader, desc='Infer')):
             fid = meta_info['file_name']
+            onehotlabels = meta_info['disease_labels']
+
             organ_feat_dict[fid] = {}
 
             image = image[None].cuda()
@@ -352,6 +404,27 @@ def evaluate():
             results.append(res)
 
             # gather the global zero-shot results like CT-CLIP
+            pathologies = ['Medical material',
+                            'Arterial wall calcification', 
+                            'Cardiomegaly', 
+                            'Pericardial effusion',
+                            'Coronary artery wall calcification', 
+                            'Hiatal hernia',
+                            'Lymphadenopathy', 
+                            'Emphysema', 
+                            'Atelectasis', 
+                            'Lung nodule',
+                            'Lung opacity', 
+                            'Pulmonary fibrotic sequela', 
+                            'Pleural effusion', 
+                            'Mosaic attenuation pattern',
+                            'Peribronchial thickening', 
+                            'Consolidation', 
+                            'Bronchiectasis',
+                            'Interlobular septal thickening']
+            predictedlabels = [[] for _ in range(onehotlabels.shape[0])] # hold the predicted multi-label vector for each sample in the batch
+            for pathology in pathologies:
+                text = [f"There is {pathology}.", f"There is no {pathology}."] #NOTE: binary classification for each pathology.
             text = 'There is Lung nodule'
             text_cls_feat = model.forward_classification_prompt(text, image.device)
             print('hello')
