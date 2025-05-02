@@ -194,7 +194,7 @@ if __name__ == "__main__":
             )
         ])
 
-    max_workers = 8
+    max_workers = 3
     func = partial(process_image, loader)
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):

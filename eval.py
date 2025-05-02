@@ -13,7 +13,7 @@ from typing import Any, Callable, List, Sequence, Tuple, Union
 from lavis.common.config import Config
 from lavis.common.registry import registry
 from lavis.common.dist_utils import get_rank, init_distributed_mode
-
+from transformers import BertTokenizer
 
 def masks_to_boxes_3d(masks):
     """Compute the bounding boxes around the provided 3D masks
@@ -121,7 +121,7 @@ class DataFolder(Dataset):
     def __init__(self):
         super().__init__()
 
-        vis_root = 'data/processed_valid_images'
+        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_val_images'
 
         img_paths = []
         for root, _, files in os.walk(vis_root):
@@ -177,6 +177,7 @@ class DataFolder(Dataset):
 
     def __getitem__(self, index):
         image_path = self.img_paths[index]
+        # automatically get the mask directory
         mask_path = image_path.replace('images', 'masks')
         
         file_name = image_path.split('/')[-1]
@@ -218,12 +219,13 @@ def evaluate():
     cfg = Config(args)
     init_distributed_mode(cfg.run_cfg)
 
+    # validation dataset
     datafolder = DataFolder()
     dataloader = DataLoader(
         datafolder,
         batch_size=1,
         shuffle=False,
-        num_workers=16,
+        num_workers=1,  # TODO:
         drop_last=False,
         collate_fn=collate_fn
     )
@@ -240,10 +242,16 @@ def evaluate():
     model_cls = registry.get_model_class(model_config.arch)
     model = model_cls.from_config(model_config)
 
+    # for zero-shot
+    # tokenizer = BertTokenizer.from_pretrained(
+    #     '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized',
+    #     config='/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized/config.json', 
+    # )
+
     for epoch in range(10, 20):
         print(f'Epoch: {epoch}')
 
-        ckpt_path = f'multi-modal-results/pretrain_ckpts/xxx/checkpoint_{epoch}.pth'
+        ckpt_path = f'/cluster/projects/mcintoshgroup/fvlm_files/train_outputs/20250428132/checkpoint_{epoch}.pth'
         
         ckpt = torch.load(
             ckpt_path, map_location='cpu'
@@ -295,8 +303,8 @@ def evaluate():
             )
             slices = dense_patch_slices(image_size, roi_size, scan_interval)
             num_win = len(slices)
-
             organ_logits = dict(zip(test_items, [[] for _ in test_items]))
+            image_cls_feat = None
             for k, v in organ_logits.items():
                 if not len(v):
                     organ_name = k[0]
@@ -314,24 +322,40 @@ def evaluate():
                     window_patch, window_mask = pad_data['image'], pad_data['label']
 
                     # print('EXTRA', organ_name, window_patch.size())
-
-                    organ_logits = model.forward_test_win(
+                    # NOTE:
+                    # 1. in lavis folder's blip_pretrain forward_test_win
+                    # 2. check the BlipPretrain class in lavis.models.blip_models 
+                    image_embeds, organ_logits = model.forward_test_win(
                         window_patch[None], 
                         window_mask[None],
-                        organ_logits,
+                        organ_logits, # recursively accumulate the stats for each organ
                         test_organs,
                         text_feat_dict,
                         organ_feat_dict[fid],
                         whole_organ_sizes,
                         skip_organ=organ_id
                     )
-                
+                    # check if the image embeddings is a cls_tokens
+                    if image_embeds.shape[1] > 1: #[1, 1232, 768]
+                        image_embeds = image_embeds.mean(dim=1, keepdim=False) # [1, 768]
+                    
+                    if image_cls_feat is None:
+                        image_cls_feat = image_embeds
+                    else:
+                        assert torch.all(image_cls_feat == image_embeds)
+
+            # gather the organ based classification results
             res = [meta_info['file_name']] + [''] * len(datafolder.test_items)
             organ_logits = {item: probs for item, probs in organ_logits.items() if len(probs) > 0}
             for item, probs in organ_logits.items():
                 res[datafolder.test_items.index(item) + 1] = np.concatenate(probs).mean(0)[1]
             results.append(res)
-        
+
+            # gather the global zero-shot results like CT-CLIP
+            text = 'There is Lung nodule'
+            text_cls_feat = model.forward_classification_prompt(text, image.device)
+            print('hello')
+
         if dist.is_initialized():
             results = np.concatenate(all_gather(results), axis=0)
             organ_feat_dict = all_gather(organ_feat_dict)

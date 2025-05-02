@@ -82,10 +82,12 @@ class CaptionDataset(BaseDataset, __DisplMixin):
         conc_info = json.load(open('/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/conc_info.json'))
 
         all_info = {}
+        # for each patient
         for patient_path in self.patient_paths:
             patient = patient_path.split('/')[-1] # the patient name like  "train_10a" or "train_10_a"
             patient = self._handle_defected_patient_dir(patient) # handle the defected directory name case
 
+            # for each organ information of that patient
             all_info[patient] = {}
             for organ in self.organs:
                 desc = ''
@@ -100,6 +102,8 @@ class CaptionDataset(BaseDataset, __DisplMixin):
                     if not conc.endswith('.'):
                         conc += '.'
                 
+                # if there is no organ information in the decomposed report => default as no significant abnomralities
+                # otherwise, if the organ has some sort of conclusion => assume there is abnormalitiies
                 if not len(conc):
                     conc = f'{organ} shows no significant abnormalities.'
                 
@@ -110,9 +114,11 @@ class CaptionDataset(BaseDataset, __DisplMixin):
                 input_text = input_text.replace('(', '')  
                 input_text = input_text.replace(')', '')
 
+                # one caption for each (patient, organ)
                 all_info[patient][organ] = input_text
-        self.annotation = all_info
 
+        # annotations are the for each (patient, organ)
+        self.annotation = all_info
         self.crop_size = (112, 256, 352)
 
     def _handle_defected_patient_dir(self, patient):
@@ -140,15 +146,16 @@ class CaptionDataset(BaseDataset, __DisplMixin):
 
                 data = self.vis_processor(data)
                 image = data['image'].as_tensor()
-                pul_seg = data['label'][0].as_tensor()
+                pul_seg = data['label'][0].as_tensor() 
                 assert image[0].shape == self.crop_size and pul_seg.shape == self.crop_size
 
-                text_input = self.annotation[patient_id]
+                text_input = self.annotation[patient_id] # caption for each organ of this patient patient_id
                 organ_abnormal_flags = torch.zeros(len(self.organs), dtype=bool)
                 for i, organ in enumerate(self.organs):
                     if organ in text_input and not text_input[organ].startswith(f'{organ} shows no significant abnormalities.'):
                         organ_abnormal_flags[i] = True
                     
+                    # if the organ key is not in the self.annotation[patient_id], assume no abnormalities
                     if organ not in text_input:
                         text_input[organ] = f'{organ} shows no significant abnormalities.'
 
@@ -161,7 +168,7 @@ class CaptionDataset(BaseDataset, __DisplMixin):
         
         return {
             "image": image,
-            "seg": pul_seg,
+            "seg": pul_seg, # the 3d segmentation mask => each slice has annotations
             "text_input": text_input,
-            "organ_abnormal_flags": organ_abnormal_flags
+            "organ_abnormal_flags": organ_abnormal_flags # a list of true and false at the size of number of organs
         }

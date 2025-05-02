@@ -127,7 +127,7 @@ class ViT(nn.Module):
                 self.classification_head = nn.Linear(hidden_size, num_classes)  # type: ignore
 
     def forward(self, x):
-        x = self.patch_embedding(x)
+        x = self.patch_embedding(x) # patchify and project into vector
         if hasattr(self, "cls_token"):
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)
             x = torch.cat((cls_token, x), dim=1)
@@ -143,4 +143,4 @@ class ViT(nn.Module):
             x = self.classification_head(x[:, 0])
         
         outs.append(x)
-        return x, outs
+        return x, outs # outs are the intermediate representations

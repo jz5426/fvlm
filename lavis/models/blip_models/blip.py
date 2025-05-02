@@ -29,7 +29,6 @@ class BlipBase(BaseModel):
             '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized',
             config='/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized/config.json', 
         )
-        # TODO: 
         return tokenizer
 
     def load_from_pretrained(self, url_or_filename):

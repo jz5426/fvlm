@@ -121,54 +121,71 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
         image = samples["image"]
         seg = samples["seg"]
 
+        # determine which organs are “completely inside” a 3D segmentation volume and not cut off by the edges (i.e., not truncated by cropping)
         with torch.no_grad():
             organ_mask_flags = torch.zeros(len(seg), len(self.organs), dtype=bool, device=seg.device)
-            for i, pul_seg in enumerate(seg):
+            for i, pul_seg in enumerate(seg): # for each patient in the batch's segmentation masks
+
+                # Extracts the 6 faces (boundaries) of the 3D volume.
                 boundaries = [
                     pul_seg[0], pul_seg[-1],
                     pul_seg[:, 0], pul_seg[:, -1],
                     pul_seg[:, :, 0], pul_seg[:, :, -1]
                 ]
                 
-                non_zero_boundaries = [b[b != 0].flatten() for b in boundaries]
-                boundary_values = torch.cat(non_zero_boundaries)
-                boundary_organs = torch.unique(boundary_values)
+                non_zero_boundaries = [b[b != 0].flatten() for b in boundaries] # collect the mask boundary at each face of the 3d vol
+                boundary_values = torch.cat(non_zero_boundaries) # merge the boundary values
+                # Gets the unique organ IDs that touch the boundary. These are likely incomplete due to cropping
+                boundary_organs = torch.unique(boundary_values) # get the boundary that belong to the organs
 
                 organ_ids, organ_counts = torch.unique(pul_seg, return_counts=True)
-                organ_ids = organ_ids[organ_ids > 0]
+                organ_ids = organ_ids[organ_ids > 0] # filter out the background
                 
                 # remove incomplete organs caused by random crop.
                 intact_organ_ids = [organ_id for organ_id in organ_ids if organ_id not in boundary_organs]
                 intact_organ_ids = torch.tensor(intact_organ_ids).long()
-                    
+                
+                # with index 0 referring to organ ID 1, index 1 for organ ID 2, and so on
                 organ_mask_flags[i][intact_organ_ids - 1] = True
 
+        # In batch
         organ_captions = samples["text_input"]
         organ_abnormal_flags = samples["organ_abnormal_flags"]
         
-        # image embeddings and features
+        # image final embeddings and intermediate features
         image_embeds, hidden_image_embeds = self.visual_encoder(image)
 
         B, L, C = image_embeds.size()
         
         with torch.no_grad():
+            # find the tokens/patch that has the corresponding organ 
             organ_token_flags = torch.zeros(B, len(self.organs), L, dtype=bool).to(image.device)
             for i in range(B):
-                inds = torch.where(organ_mask_flags[i])[0]
+                inds = torch.where(organ_mask_flags[i])[0] # find out the organs that have flag as true (there could be multiple)
                 if not len(inds):
                     continue
                 
+                # seg[i] == organ_id + 1 gives True at voxels belonging to that organ.
+                # gives [num_intact_organs, D, H, W], DHW comes from seg 3d mask, seg[i] is the segmentation mask for batch item i
                 masks = torch.stack(
                     [torch.eq(seg[i], organ_id + 1) for organ_id in inds], dim=0).float()
 
+                # Downsamples the masks to token resolution using max pooling.
+                # note that the mask is in the resolution of the input image (at the pixel level not the patch/token level)
+                # => [num_intact_organs, D', H', W'], where D' x H' x W' = L, the number of patch tokens
                 downsampled_masks = F.max_pool3d(
                     masks.unsqueeze(1),
                     kernel_size=(16, 16, 32),
                     stride=(16, 16, 32)
                 )
                 
+                # downsampled_masks.flatten(1），
+                # flattens all dimensions starting from dimension 1 into a single dimension, preserving the organ dimension 
+                # => each organ's mask becomes a multi-hot vector at the size of L, which is the same as image_embeds[1] = L
+                # finally, transform the downsampled_masks to boolean vector
                 organ_token_flags[i][inds] = downsampled_masks.flatten(1) > 0
 
+                # make sure each organ's mask exists
                 assert all((downsampled_masks.flatten(1) > 0).sum(1) > 0)
         
         with torch.no_grad():
@@ -176,11 +193,14 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
 
         # criteria to calculate loss
         with torch.no_grad():
+
+            # Result is True only for organs that are both "abnormal and intact"
             organ_status_world = (organ_abnormal_flags & organ_mask_flags).sum(0)
             if is_dist_avail_and_initialized():
                 dist.all_reduce(organ_status_world, op=dist.ReduceOp.SUM)
         
-        cl_organ_ids = torch.where(organ_status_world)[0]
+        # organ_status_world[i] holds the total number of samples across all GPUs where organ i is both abnormal and fully visible.
+        cl_organ_ids = torch.where(organ_status_world)[0] # the indices of the organ counts > 0
         
         organ_wise_loss_itm = {}
         for cl_organ_id in cl_organ_ids:
@@ -188,6 +208,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
 
             template = f'{organ_name} shows no significant abnormalities.'
 
+            # patient id withint the batch
             cl_patient_ids = torch.where(organ_mask_flags[:, cl_organ_id])[0]
 
             if not len(cl_patient_ids):
@@ -196,8 +217,13 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 cl_text_input = []
 
             else:
+                # get the token features of a particular organ.
                 # image_feat = self.get_roi_features(image_embeds, organ_token_flags, cl_patient_ids, cl_organ_id)
-                image_feat = self.get_roi_features(hidden_image_embeds, organ_token_flags, cl_patient_ids, cl_organ_id)
+                image_feat = self.get_roi_features(
+                    hidden_image_embeds, 
+                    organ_token_flags,
+                    cl_patient_ids, cl_organ_id
+                )
                 image_feat = self.vision_projs[cl_organ_id](image_feat)
                 image_feat = F.normalize(image_feat, dim=-1)
 
@@ -303,6 +329,25 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
     #     roi_feats = torch.cat(roi_feats, dim=0)
     #     return roi_feats
 
+    def forward_classification_prompt(self, cl_text_input1, device):
+        text = self.tokenizer(
+            cl_text_input1,
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_txt_len,
+            return_tensors="pt",
+        ).to(device)
+
+        text_output = self.text_encoder.forward_text(text)
+        text_embeds = text_output.last_hidden_state
+
+        # NOTE: without projection for the global classification
+        # text_feat = F.normalize(self.text_proj(text_embeds[:, 0, :]), dim=-1)
+        text_feat = F.normalize(text_embeds[:, 0, :], dim=-1)
+
+        return text_feat
+
+
     def get_roi_features(self, hidden_image_embeds, organ_token_flags, cl_patient_ids, cl_organ_id):
         query = self.query_tokens[cl_organ_id].unsqueeze(0).unsqueeze(0)
 
@@ -312,6 +357,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
             
             organ_tokens = []
             for ms_image_embed in hidden_image_embeds:
+                # all the hidden image embeddings are of the same shape => one patch one embedding
                 organ_tokens.append(ms_image_embed[patient_id, tokens])
             key = value = torch.cat(organ_tokens, dim=0).unsqueeze(0)
 
@@ -408,6 +454,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
         skip_organ=None
     ):
         # image_embeds  = self.visual_encoder(images)
+        # NOTE: If there is a classification token, image_embeds is the cls_token, otherwise, we need to average them as a classification tokens
         image_embeds, hidden_image_embeds = self.visual_encoder(images)
 
         B, L, C = image_embeds.size()
@@ -491,9 +538,9 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
 
                     logits = image_feat @ text_feat.t() / self.temp
                     probs = logits.softmax(-1)
-                    organ_logits[item].append(probs.cpu().tolist())
+                    organ_logits[item].append(probs.cpu().tolist()) # for each organ, there is logit score, recall from the equation 2 in the fvlm paper
     
-        return organ_logits
+        return image_embeds, organ_logits
 
     def prepare_text_feat(self, test_items, length=None):
         if length is None:
