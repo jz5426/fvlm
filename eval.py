@@ -14,7 +14,6 @@ from lavis.common.config import Config
 from lavis.common.registry import registry
 from lavis.common.dist_utils import get_rank, init_distributed_mode
 from transformers import BertTokenizer
-from sklearn.metrics import f1_score, accuracy_score
 
 
 def apply_softmax(array):
@@ -326,7 +325,7 @@ def evaluate():
     model_cls = registry.get_model_class(model_config.arch)
     model = model_cls.from_config(model_config)
 
-    for epoch in range(0, 10):
+    for epoch in range(0, 51):
     # for epoch in range(0, 1):
 
         print(f'Epoch: {epoch}')
