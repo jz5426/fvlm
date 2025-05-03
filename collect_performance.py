@@ -32,7 +32,7 @@ test_items = [
 conditions = [item[1] for item in test_items if item[1] in reference_df.columns]
 
 # === Process each CSV file in directory ===
-for file in os.listdir(csv_directory):
+for file in sorted(os.listdir(csv_directory)):
     if not file.endswith('.csv'):
         continue
 
