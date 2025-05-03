@@ -537,9 +537,10 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 for item in organ_logits.keys():
                     if item[0] != organ_name:
                         continue
+                    # postive and negative prompt embedding
+                    text_feat = text_feat_dict[item] # that is, using the same text embeddings for that key
 
-                    text_feat = text_feat_dict[item]
-
+                    # perform disease zero-shot classification based on binary prompt for each disease (check Datafolder)
                     logits = image_feat @ text_feat.t() / self.temp
                     probs = logits.softmax(-1)
                     organ_logits[item].append(probs.cpu().tolist()) # for each organ, there is logit score, recall from the equation 2 in the fvlm paper

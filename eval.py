@@ -9,11 +9,27 @@ from torch.utils.data import Dataset, DataLoader
 from monai import transforms
 from monai.data.utils import dense_patch_slices
 from typing import Any, Callable, List, Sequence, Tuple, Union
-
+from torch import nn, einsum
 from lavis.common.config import Config
 from lavis.common.registry import registry
 from lavis.common.dist_utils import get_rank, init_distributed_mode
 from transformers import BertTokenizer
+from sklearn.metrics import f1_score, accuracy_score
+
+
+def apply_softmax(array):
+    """
+    Applies softmax function to a torch array.
+
+    Args:
+        array (torch.Tensor): Input tensor array.
+
+    Returns:
+        torch.Tensor: Tensor array after applying softmax.
+    """
+    softmax = torch.nn.Softmax(dim=0)
+    softmax_array = softmax(array)
+    return softmax_array
 
 def masks_to_boxes_3d(masks):
     """Compute the bounding boxes around the provided 3D masks
@@ -147,7 +163,25 @@ class DataFolder(Dataset):
             transforms.LoadImaged(keys=["image", "label"], image_only=True, ensure_channel_first=True)
         ])
         
-        self.pathologies = ['Medical material', 'Arterial wall calcification', 'Cardiomegaly', 'Pericardial effusion','Coronary artery wall calcification', 'Hiatal hernia','Lymphadenopathy', 'Emphysema', 'Atelectasis', 'Lung nodule','Lung opacity', 'Pulmonary fibrotic sequela', 'Pleural effusion', 'Mosaic attenuation pattern','Peribronchial thickening', 'Consolidation', 'Bronchiectasis','Interlobular septal thickening']
+        self.pathologies = [
+            'Medical material', # do not exists
+            'Arterial wall calcification', 
+            'Cardiomegaly', 
+            'Pericardial effusion',
+            'Coronary artery wall calcification', 
+            'Hiatal hernia', 
+            'Lymphadenopathy', # does not belong to any organ
+            'Emphysema', 
+            'Atelectasis', 
+            'Lung nodule', 
+            'Lung opacity', 
+            'Pulmonary fibrotic sequela', 
+            'Pleural effusion', 
+            'Mosaaic ttenuation pattern',
+            'Peribronchial thickening', 
+            'Consolidation', 
+            'Bronchiectasis',
+            'Interlobular septal thickening']
 
         self.test_items = [
             ['lung', 'Emphysema', 'Not Emphysema.', 'Emphysema.'],
@@ -263,7 +297,7 @@ def evaluate():
     args = parse_args()
 
     cfg = Config(args)
-    init_distributed_mode(cfg.run_cfg)
+    # init_distributed_mode(cfg.run_cfg)
 
     # validation dataset
     # TODO: supposed to be the report and labels file for val split but for the testing, our val split comes from the train split.
@@ -273,7 +307,7 @@ def evaluate():
     )
     dataloader = DataLoader(
         datafolder,
-        batch_size=1,
+        batch_size=1, # NOTE: ALWAYS
         shuffle=False,
         num_workers=1,  # TODO:
         drop_last=False,
@@ -292,17 +326,13 @@ def evaluate():
     model_cls = registry.get_model_class(model_config.arch)
     model = model_cls.from_config(model_config)
 
-    # for zero-shot
-    # tokenizer = BertTokenizer.from_pretrained(
-    #     '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized',
-    #     config='/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized/config.json', 
-    # )
+    for epoch in range(0, 10):
+    # for epoch in range(0, 1):
 
-    for epoch in range(90, 95):
         print(f'Epoch: {epoch}')
 
         ckpt_path = f'/cluster/projects/mcintoshgroup/fvlm_files/train_outputs/20250428132/checkpoint_{epoch}.pth'
-        
+        # ckpt_path = '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'        
         ckpt = torch.load(
             ckpt_path, map_location='cpu'
         )
@@ -318,8 +348,6 @@ def evaluate():
         # Set global precision for printing tensors
         torch.set_printoptions(precision=2)
         
-        sw_batch_size = 4
-
         overlap = 0.25
         roi_size = (112, 288, 352)
 
@@ -330,7 +358,8 @@ def evaluate():
         organ_feat_dict = {}
 
         save_path = '_'.join(ckpt_path.replace('.pth', '').split('/')[1:])
-
+        
+        predictedall, realall = [], []
         for i, (image, mask, test_items, meta_info) in enumerate(tqdm(dataloader, desc='Infer')):
             fid = meta_info['file_name']
             onehotlabels = meta_info['disease_labels']
@@ -358,6 +387,7 @@ def evaluate():
             organ_logits = dict(zip(test_items, [[] for _ in test_items]))
             image_cls_feat = None
             for k, v in organ_logits.items():
+                # skip the ones that have not dont zero-shot
                 if not len(v):
                     organ_name = k[0]
                     organ_id = datafolder.organs.index(organ_name)
@@ -392,42 +422,58 @@ def evaluate():
                         image_embeds = image_embeds.mean(dim=1, keepdim=False) # [1, 768]
                     
                     if image_cls_feat is None:
-                        image_cls_feat = image_embeds
-                    else:
-                        assert torch.all(image_cls_feat == image_embeds)
+                        image_cls_feat = image_embeds.clone()
+                    # else:
+                    #     assert torch.all(image_cls_feat == image_embeds)
 
             # gather the organ based classification results
             res = [meta_info['file_name']] + [''] * len(datafolder.test_items)
             organ_logits = {item: probs for item, probs in organ_logits.items() if len(probs) > 0}
             for item, probs in organ_logits.items():
+                # the following encode postive prompt probability in the excel sheet
                 res[datafolder.test_items.index(item) + 1] = np.concatenate(probs).mean(0)[1]
             results.append(res)
 
-            # gather the global zero-shot results like CT-CLIP
-            pathologies = ['Medical material',
-                            'Arterial wall calcification', 
-                            'Cardiomegaly', 
-                            'Pericardial effusion',
-                            'Coronary artery wall calcification', 
-                            'Hiatal hernia',
-                            'Lymphadenopathy', 
-                            'Emphysema', 
-                            'Atelectasis', 
-                            'Lung nodule',
-                            'Lung opacity', 
-                            'Pulmonary fibrotic sequela', 
-                            'Pleural effusion', 
-                            'Mosaic attenuation pattern',
-                            'Peribronchial thickening', 
-                            'Consolidation', 
-                            'Bronchiectasis',
-                            'Interlobular septal thickening']
-            predictedlabels = [[] for _ in range(onehotlabels.shape[0])] # hold the predicted multi-label vector for each sample in the batch
-            for pathology in pathologies:
-                text = [f"There is {pathology}.", f"There is no {pathology}."] #NOTE: binary classification for each pathology.
-            text = 'There is Lung nodule'
-            text_cls_feat = model.forward_classification_prompt(text, image.device)
-            print('hello')
+        #     # gather the global zero-shot results like CT-CLIP
+        #     pathologies = ['Medical material',
+        #                     'Arterial wall calcification', 
+        #                     'Cardiomegaly', 
+        #                     'Pericardial effusion',
+        #                     'Coronary artery wall calcification', 
+        #                     'Hiatal hernia',
+        #                     'Lymphadenopathy', 
+        #                     'Emphysema', 
+        #                     'Atelectasis',
+        #                     'Lung nodule',
+        #                     'Lung opacity', 
+        #                     'Pulmonary fibrotic sequela', 
+        #                     'Pleural effusion', 
+        #                     'Mosaic attenuation pattern',
+        #                     'Peribronchial thickening', 
+        #                     'Consolidation', 
+        #                     'Bronchiectasis',
+        #                     'Interlobular septal thickening']
+        #     predictedlabels = [] # hold the predicted multi-label vector for each sample in the batch
+        #     for pathology in pathologies:
+        #         text = [f"There is {pathology}.", f"There is no {pathology}."] #NOTE: binary classification for each pathology.
+        #         text_cls_feat = model.forward_classification_prompt(text, image.device) # shape [2,768]
+
+        #         # perform cosine similarity NOTE: always batch size of 1
+        #         outputs = einsum('t d, i d -> t i', *[image_cls_feat, text_cls_feat])
+        #         if outputs[:, 0] > outputs[:, 1]:
+        #             predictedlabels.append(1) # 1 indicates has pathology in the one-hot label
+        #         else:
+        #             predictedlabels.append(0) # 0 indicates no pathnology in the one-hot label
+
+        #     predictedall.extend(predictedlabels)
+        #     realall.extend(list(onehotlabels))
+
+        # realall = np.rint(realall).astype(int)
+        # predictedall = np.rint(predictedall).astype(int)
+        
+        # f1 = f1_score(realall, predictedall,average='micro')
+        # flat_acc = accuracy_score(realall.flatten(), predictedall.flatten())
+        # print('    Checkpoint {} Validation F1 Accuracy: {}; Validation Flat Accuracy: {}\n'.format(epoch, f1, flat_acc))
 
         if dist.is_initialized():
             results = np.concatenate(all_gather(results), axis=0)
@@ -436,11 +482,11 @@ def evaluate():
             organ_feat_dict = [organ_feat_dict]
         
         if rank == 0:
-            os.makedirs('rate_res', exist_ok=True)
+            os.makedirs('/cluster/projects/mcintoshgroup/fvlm_files/rate_results', exist_ok=True)
             pd.DataFrame(
                 results,
                 columns=['file_name'] + ['_'.join(k) for k in datafolder.test_items]
-            ).to_csv(f'rate_res/{save_path}.csv', index=False, encoding='utf-8')
+            ).to_csv(f'/cluster/projects/mcintoshgroup/fvlm_files/rate_results/{save_path}.csv', index=False, encoding='utf-8')
             
             print('Save csv file successfully!')
 
