@@ -530,6 +530,10 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 updated_query_token, _ = self.attention(query, key, value)
                 updated_query_token = updated_query_token.squeeze(0)
 
+                # recall the organ id is obtained from the mask of the correponding image.
+                # you should get the mask from the preprocessing stage both for the training and validation data.
+                # with the identified organs in the input image, use corresponding organ disease projector to obtained the 
+                # organ representation in 128-d
                 image_feat = F.normalize(self.vision_projs[organ_id](updated_query_token), dim=-1)
                 
                 organ_feat_dict[organ_name] = image_feat.cpu().tolist()
@@ -537,10 +541,11 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
                 for item in organ_logits.keys():
                     if item[0] != organ_name:
                         continue
-                    # postive and negative prompt embedding
+                    # negative and postive prompt embedding for each disease
                     text_feat = text_feat_dict[item] # that is, using the same text embeddings for that key
 
                     # perform disease zero-shot classification based on binary prompt for each disease (check Datafolder)
+                    # image feature is obtained from the organ projector that the disease is related to.
                     logits = image_feat @ text_feat.t() / self.temp
                     probs = logits.softmax(-1)
                     organ_logits[item].append(probs.cpu().tolist()) # for each organ, there is logit score, recall from the equation 2 in the fvlm paper
@@ -554,6 +559,8 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
         device = self.text_encoder.device
         text_feat_dict = {}
         for prompt, item in zip(*self._get_prompt(test_items)):
+
+            # this is the item that contain negative and positive prompt
             text = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -567,6 +574,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
             text_feat = F.normalize(self.text_proj(text_embeds[:, 0, :]), dim=-1)
             text_feat_dict[tuple(item)] = text_feat
 
+        # for each disease item, it has the text feature of the negative and positive prompts
         return text_feat_dict
     
     @staticmethod
@@ -577,6 +585,7 @@ class BlipPretrain(BlipBase, SharedQueueMixin, MomentumDistilationMixin):
         if organ_name is not None:
             test_items = [item for item in test_items if item[0] == organ_name]
 
+        # get only the negative and postive prompt for each disease based on the text_items
         negative_prompts = [item[2] for item in test_items]
         positive_prompts = [item[3] for item in test_items]
 

@@ -352,6 +352,7 @@ def evaluate():
 
         results = []
         
+        # for each disease item, it has the text feature of the negative and positive prompts
         text_feat_dict = model.prepare_text_feat(datafolder.test_items)
 
         organ_feat_dict = {}
@@ -385,6 +386,9 @@ def evaluate():
             num_win = len(slices)
             organ_logits = dict(zip(test_items, [[] for _ in test_items]))
             image_cls_feat = None
+
+            # iterate all the possible diseases specified in the Datafolder class
+            # note that each time it will finish all the disease prompt within the organ (if arrives to the if condition)
             for k, v in organ_logits.items():
                 # skip the ones that have not dont zero-shot
                 if not len(v):
@@ -406,6 +410,7 @@ def evaluate():
                     # NOTE:
                     # 1. in lavis folder's blip_pretrain forward_test_win
                     # 2. check the BlipPretrain class in lavis.models.blip_models 
+                    # NOTE: IMPORTANT, it uses the mask of the input image to identify the organ and the associated organ projector.
                     image_embeds, organ_logits = model.forward_test_win(
                         window_patch[None], 
                         window_mask[None],
@@ -429,7 +434,15 @@ def evaluate():
             res = [meta_info['file_name']] + [''] * len(datafolder.test_items)
             organ_logits = {item: probs for item, probs in organ_logits.items() if len(probs) > 0}
             for item, probs in organ_logits.items():
+                if len(probs) > 1:
+                    print('something wrong')
+                if np.concatenate(probs).shape != (1,2):
+                    print("shape is not expected")
                 # the following encode postive prompt probability in the excel sheet
+                # probs is [[[0.62, 0.37]]] represents the logit for negative and postive disease prompt for the particular diseases
+                # np.concatenate(probs).shape = (1,2)
+                # np.concatenate(probs).mean(0).shape = (,2), number does not change
+                # np.concatenate(probs).mean(0)[1] retrieve 0.37, the positive prompt logit score
                 res[datafolder.test_items.index(item) + 1] = np.concatenate(probs).mean(0)[1]
             results.append(res)
 
