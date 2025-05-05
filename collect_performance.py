@@ -68,6 +68,7 @@ for file in sorted(os.listdir(csv_directory)):
     file_to_preds = {}
     for _, row in df.iterrows():
         file_name = row['file_name']
+        # recall this is positive disease logit
         preds = [1 if row[col] >= 0.5 else 0 for col in original_ordered_col_names]
         file_to_preds[file_name] = preds
 
