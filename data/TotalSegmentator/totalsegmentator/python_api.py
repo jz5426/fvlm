@@ -10,7 +10,7 @@ import numpy as np
 import nibabel as nib
 from nibabel.nifti1 import Nifti1Image
 import torch
-from totalsegmentator.statistics import get_basic_statistics, get_radiomics_features_for_entire_dir
+from TotalSegmentator.totalsegmentator.statistics import get_basic_statistics, get_radiomics_features_for_entire_dir
 from totalsegmentator.config import setup_nnunet, setup_totalseg, increase_prediction_counter
 from totalsegmentator.config import send_usage_stats, set_license_number, has_valid_license_offline
 from totalsegmentator.config import get_config_key, set_config_key

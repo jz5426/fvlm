@@ -15,12 +15,18 @@ def generate_mask(row):
     # filepath = os.path.join(data_root, f"{split}_fixed", dir2, dir1, VolumeName)
     # dirpath = os.path.dirname(filepath)
     # dirpath = dirpath.replace(f"/{split}_fixed/", f"/{split}_mask/")
-
     # transform from "train_1_a" to "train_1a" NOTE:TODO: this is just temporary changes, the file structure should follows exactly the same as the one from metadata file ideally.
-    dir1 = dir1[::-1].replace("_", "", 1)[::-1] 
-    filepath = os.path.join(f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed', dir2, dir1, VolumeName)
+
+    ## NOTE: for .h5 files
+    # dir1 = dir1[::-1].replace("_", "", 1)[::-1] 
+    # filepath = os.path.join(f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed', dir2, dir1, VolumeName)
+    # dirpath = os.path.dirname(filepath)
+    # dirpath = dirpath.replace(f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed/", f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/")
+
+    ## NOTE: for original valid_fixed files
+    filepath = os.path.join(f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{split}_fixed', dir2, dir1, VolumeName)
     dirpath = os.path.dirname(filepath)
-    dirpath = dirpath.replace(f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_fixed/", f"/CTRATE_Volumes_raw_h5_fp16_noflip_{split}_mask/")
+    dirpath = dirpath.replace(f"/{split}_fixed/", f"/{split}_mask/")
 
     # skip the files if not exists in the data directory
     if not os.path.exists(filepath):
@@ -47,15 +53,14 @@ if __name__ == "__main__":
 
     #NOTE: depends on the _fix data
 
-    split = 'val'
-    d = "validation" if split == "val" else "train"
+    split = 'valid'
     data_root = Path("/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/")
     # metadata = pd.read_csv(os.path.join(data_root, f"metadata/{d}_metadata.csv")) # TODO: uncomment this when the val splits actually comes from the val_metadata
-    metadata = pd.read_csv(os.path.join(data_root, f"metadata/train_metadata.csv"))
+    metadata = pd.read_csv(os.path.join(data_root, f"metadata/{'validation' if split == 'valid' else split}_metadata.csv"))
 
     rows = [row[1] for row in metadata.iterrows()]
-    for row in rows:
-        generate_mask(row)
-    # generate_mask(rows[0])
+    # for row in rows:
+    #     generate_mask(row)
+    generate_mask(rows[0])
     print('finished generate_mask.py script')
 

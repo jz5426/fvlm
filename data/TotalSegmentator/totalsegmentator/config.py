@@ -29,7 +29,6 @@ def get_weights_dir():
     if "TOTALSEG_WEIGHTS_PATH" in os.environ:
         # config_dir = Path(os.environ["TOTALSEG_WEIGHTS_PATH"])
         config_dir = Path('/cluster/projects/mcintoshgroup/totalsegmentator_pretrained_weights')
-
     else:
         totalseg_dir = get_totalseg_dir()
         config_dir = totalseg_dir

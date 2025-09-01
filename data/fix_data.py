@@ -1,3 +1,7 @@
+"""
+note that if the data are downloaded as 'valid_fixed' or 'train_fixed', no need to run this script.
+"""
+
 import ast
 import concurrent.futures
 import os
