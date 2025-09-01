@@ -1,0 +1,2 @@
+1. follow the instruction from fvlm repo to install the packages (except the totalsegmentator one, which is supposed to be commented)
+2. go to the path ./data/TotalSegmentator, then pip install -e . to enable using the editable version of the totalsegmentator (do not use the pip install TotalSegmentator command, this will create a lot of trouble)

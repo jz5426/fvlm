@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import nibabel as nib
 import pandas as pd
+from tqdm import tqdm
 if os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) not in sys.path:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.TotalSegmentator.totalsegmentator.python_api import totalsegmentator
@@ -59,8 +60,8 @@ if __name__ == "__main__":
     metadata = pd.read_csv(os.path.join(data_root, f"metadata/{'validation' if split == 'valid' else split}_metadata.csv"))
 
     rows = [row[1] for row in metadata.iterrows()]
-    # for row in rows:
-    #     generate_mask(row)
-    generate_mask(rows[0])
+    for row in tqdm(rows, desc="Generating masks"):
+        generate_mask(row)
+    # generate_mask(rows[0])
     print('finished generate_mask.py script')
 
