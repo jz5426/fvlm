@@ -245,12 +245,12 @@ def process(mask_path):
     #     print(f"image mask file {original_mask_path} does not exist.")
 
     ## remove the mask from the merged_mask folder if successfully resized.
-    merged_mask = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/merged_{phase}_masks/{relative_path}"
-    if os.path.isfile(merged_mask):
-        os.remove(merged_mask)
-        print(f"Removed image merged mask file {merged_mask} from _mask_path folder")
-    else:
-        print(f"image merged mask file {merged_mask} does not exist.")
+    # merged_mask = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/merged_{phase}_masks/{relative_path}"
+    # if os.path.isfile(merged_mask):
+    #     os.remove(merged_mask)
+    #     print(f"Removed image merged mask file {merged_mask} from _mask_path folder")
+    # else:
+    #     print(f"image merged mask file {merged_mask} does not exist.")
     
 if "__main__" == __name__:
     #NOTE: depends on the _fix and _mask data

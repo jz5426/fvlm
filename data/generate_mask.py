@@ -60,8 +60,8 @@ if __name__ == "__main__":
     metadata = pd.read_csv(os.path.join(data_root, f"metadata/{'validation' if split == 'valid' else split}_metadata.csv"))
 
     rows = [row[1] for row in metadata.iterrows()]
-    # for row in tqdm(rows, desc="Generating masks"):
-    #     generate_mask(row)
-    generate_mask(rows[0])
+    for row in tqdm(rows, desc="Generating masks"):
+        generate_mask(row)
+    # generate_mask(rows[0])
     print('finished generate_mask.py script')
 

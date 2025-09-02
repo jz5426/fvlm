@@ -22,7 +22,7 @@ def process_image(loader, mask_path):
     original_mask_path = mask_path
     img_path = None
     try:
-        phase = 'train' if 'train_mask' in mask_path else 'val'
+        phase = 'train' if 'train_mask' in mask_path else 'valid'
 
         # mask_path = mask_path.replace(
         #     f"{phase}_mask", 
@@ -45,12 +45,6 @@ def process_image(loader, mask_path):
         #     return None
         
         trans_input = {"image": img_path, "label": mask_path}
-        # load = transforms.LoadImaged(keys=["image", "label"], image_only=True, ensure_channel_first=True)
-        # transpose = transforms.Transposed(keys=["image", "label"], indices=(0, 3, 2, 1))
-        # scaleIntensity = transforms.ScaleIntensityRanged(
-        #     keys=["image"], a_min=-1150, a_max=350,
-        #     b_min=0.0, b_max=1.0, clip=True
-        # )
         data = loader(trans_input)
 
         image = data["image"]
@@ -111,7 +105,7 @@ def process_image(loader, mask_path):
                     output_postfix="",
                     separate_folder=False,
                     resample=False,
-                    dtype=np.float16 # TODO: make sure that with sangwook of the right datatype for space shrinking
+                    dtype=np.float32 # TODO: make sure that with sangwook of the right datatype for space shrinking
                 ),
                 transforms.SaveImaged(
                     output_dir=str(
@@ -132,20 +126,20 @@ def process_image(loader, mask_path):
         print('Error', e, img_path)
         return
 
-    # remove the mask from the resized_mask folder if successfully preprocessed.
-    if os.path.isfile(original_mask_path):
-        os.remove(original_mask_path)
-        print(f"Removed image mask file {original_mask_path} from resized_mask_path folder")
-    else:
-        print(f"image mask file {original_mask_path} does not exist.")
+    # # remove the mask from the resized_mask folder if successfully preprocessed.
+    # if os.path.isfile(original_mask_path):
+    #     os.remove(original_mask_path)
+    #     print(f"Removed image mask file {original_mask_path} from resized_mask_path folder")
+    # else:
+    #     print(f"image mask file {original_mask_path} does not exist.")
 
 
-    # remove the image from the resized_mask folder if successfully preprocessed.
-    if os.path.isfile(img_path):
-        os.remove(img_path)
-        print(f"Removed image file {img_path} from resized_image_path folder")
-    else:
-        print(f"image file {img_path} does not exist.")
+    # # remove the image from the resized_mask folder if successfully preprocessed.
+    # if os.path.isfile(img_path):
+    #     os.remove(img_path)
+    #     print(f"Removed image file {img_path} from resized_image_path folder")
+    # else:
+    #     print(f"image file {img_path} does not exist.")
 
 # the following replace the original patient_paths implementation above
 def _find_second_level_dirs(root_dir, substring=None):
@@ -173,9 +167,9 @@ if __name__ == "__main__":
 
     # NOTE: depends on the resized_{phrase}_images and resized_{phrase}_masks data
 
-    split = 'val'
-    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_masks/'    
-    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_resized_{split}_images/'
+    split = 'valid'
+    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{split}_masks/'    
+    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{split}_images/'
     # patient_paths = _find_second_level_dirs(image_root, 'train_')
     # np.save("/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/patient_paths.npy", np.array(patient_paths))
 
@@ -194,7 +188,7 @@ if __name__ == "__main__":
             )
         ])
 
-    max_workers = 3
+    max_workers = 10
     func = partial(process_image, loader)
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):
@@ -202,15 +196,15 @@ if __name__ == "__main__":
 
     # process_image(loader, mask_paths[0])
 
-    # remove the resized_image directory
-    if os.path.isdir(image_root) and count_files_with_suffix(image_root, '.nii.gz') == 0:
-        shutil.rmtree(image_root)
-        print(f"{image_root} removed.")
+    # # remove the resized_image directory
+    # if os.path.isdir(image_root) and count_files_with_suffix(image_root, '.nii.gz') == 0:
+    #     shutil.rmtree(image_root)
+    #     print(f"{image_root} removed.")
 
-    # remove the resized_mask directory
-    if os.path.isdir(mask_root) and count_files_with_suffix(mask_root, '.nii.gz') == 0:
-        shutil.rmtree(mask_root)
-        print(f"{mask_root} removed.")
+    # # remove the resized_mask directory
+    # if os.path.isdir(mask_root) and count_files_with_suffix(mask_root, '.nii.gz') == 0:
+    #     shutil.rmtree(mask_root)
+    #     print(f"{mask_root} removed.")
     
     print('finished preprocess.py script')
     
