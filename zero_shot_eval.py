@@ -1,3 +1,6 @@
+"""
+code borrowed from the offical eval.py
+"""
 import os
 import argparse
 import numpy as np
@@ -136,7 +139,7 @@ class DataFolder(Dataset):
     def __init__(self, report_file, label_file, file_extension='.nii.gz'):
         super().__init__()
 
-        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_val_images'
+        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/valid_fixed'
         self.file_extension = file_extension
         img_paths = []
         for root, _, files in os.walk(vis_root):
@@ -301,8 +304,8 @@ def evaluate():
     # validation dataset
     # TODO: supposed to be the report and labels file for val split but for the testing, our val split comes from the train split.
     datafolder = DataFolder(
-        report_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/radiology_text_reports/train_reports.csv',
-        label_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/dataset_multi_abnormality_labels_train_predicted_labels.csv' 
+        report_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/radiology_text_reports/valid_reports.csv',
+        label_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/valid_predicted_labels.csv' 
     )
     dataloader = DataLoader(
         datafolder,
@@ -324,142 +327,137 @@ def evaluate():
     model_config = cfg.model_cfg
     model_cls = registry.get_model_class(model_config.arch)
     model = model_cls.from_config(model_config)
+    
+    # use the downloaded pretrained weights from fvlm
+    ckpt_path = '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'
+    ckpt = torch.load(
+        ckpt_path, map_location='cpu'
+    )
+    
+    model.load_state_dict(ckpt['model'], strict=False)
 
-    for epoch in range(0, 51): # NOTE: this is for the checkpoint.
-    # for epoch in range(0, 1):
+    rank = get_rank()
+    torch.cuda.set_device(rank)
 
-        print(f'Epoch: {epoch}')
+    model.eval()
+    model.cuda()
 
-        ckpt_path = f'/cluster/projects/mcintoshgroup/fvlm_files/train_outputs/20250428132/checkpoint_{epoch}.pth'
-        # ckpt_path = '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'        
-        ckpt = torch.load(
-            ckpt_path, map_location='cpu'
+    # Set global precision for printing tensors
+    torch.set_printoptions(precision=2)
+    
+    overlap = 0.25
+    roi_size = (112, 288, 352)
+
+    results = []
+    
+    # for each disease item, it has the text feature of the negative and positive prompts
+    text_feat_dict = model.prepare_text_feat(datafolder.test_items)
+
+    organ_feat_dict = {}
+
+    save_path = '_'.join(ckpt_path.replace('.pth', '').split('/')[1:])
+    
+    predictedall, realall = [], []
+    for i, (image, mask, test_items, meta_info) in enumerate(tqdm(dataloader, desc='Infer')):
+        fid = meta_info['file_name']
+        onehotlabels = meta_info['disease_labels']
+
+        organ_feat_dict[fid] = {}
+
+        image = image[None].cuda()
+        mask = mask[None].cuda()
+
+        test_organs = meta_info['test_organ_names']
+        
+        whole_organ_sizes = dict(zip(test_organs, [torch.eq(mask, datafolder.organs.index(test_organ) + 1).sum().item() for test_organ in test_organs]))    
+
+        test_organs = [test_organ for test_organ in test_organs if whole_organ_sizes[test_organ] > 0]
+        test_items = [test_item for test_item in test_items if test_item[0] in test_organs]
+
+        image_size = list(image.shape[2:])
+        num_spatial_dims = len(image.shape) - 2
+
+        scan_interval = _get_scan_interval(
+            image_size, roi_size, num_spatial_dims, overlap
         )
+        slices = dense_patch_slices(image_size, roi_size, scan_interval)
+        num_win = len(slices)
+        organ_logits = dict(zip(test_items, [[] for _ in test_items]))
+        image_cls_feat = None
+
+        # iterate all the possible diseases specified in the Datafolder class
+        # note that each time it will finish all the disease prompt within the organ (if arrives to the if condition)
+        for k, v in organ_logits.items():
+            # skip the ones that have not dont zero-shot
+            if not len(v):
+                organ_name = k[0]
+                organ_id = datafolder.organs.index(organ_name)
+
+                window_patch, window_mask = center_crop(
+                    image,
+                    torch.eq(mask, organ_id + 1),
+                    crop_size=roi_size
+                )
+                window_mask = window_mask.float()
+                window_mask[window_mask == 1] = organ_id + 1
+
+                pad_data = pad_func({'image': window_patch[0], 'label': window_mask[0]})
+                window_patch, window_mask = pad_data['image'], pad_data['label']
+
+                # print('EXTRA', organ_name, window_patch.size())
+                # NOTE:
+                # 1. in lavis folder's blip_pretrain forward_test_win
+                # 2. check the BlipPretrain class in lavis.models.blip_models 
+                # NOTE: IMPORTANT, it uses the mask of the input image to identify the organ and the associated organ projector.
+                image_embeds, organ_logits = model.forward_test_win(
+                    window_patch[None], 
+                    window_mask[None],
+                    organ_logits, # recursively accumulate the stats for each organ
+                    test_organs,
+                    text_feat_dict,
+                    organ_feat_dict[fid],
+                    whole_organ_sizes,
+                    skip_organ=organ_id
+                )
+                # check if the image embeddings is a cls_tokens
+                if image_embeds.shape[1] > 1: #[1, 1232, 768]
+                    image_embeds = image_embeds.mean(dim=1, keepdim=False) # [1, 768]
+                
+                if image_cls_feat is None:
+                    image_cls_feat = image_embeds.clone()
+                # else:
+                #     assert torch.all(image_cls_feat == image_embeds)
+
+        # gather the organ based classification results
+        res = [meta_info['file_name']] + [''] * len(datafolder.test_items)
+        organ_logits = {item: probs for item, probs in organ_logits.items() if len(probs) > 0}
+        for item, probs in organ_logits.items():
+            if len(probs) > 1:
+                print('something wrong')
+            if np.concatenate(probs).shape != (1,2):
+                print("shape is not expected")
+            # the following encode postive prompt probability in the excel sheet
+            # probs is [[[0.62, 0.37]]] represents the logit for negative and postive disease prompt for the particular diseases
+            # np.concatenate(probs).shape = (1,2)
+            # np.concatenate(probs).mean(0).shape = (,2), number does not change
+            # np.concatenate(probs).mean(0)[1] retrieve 0.37, the positive prompt logit score
+            res[datafolder.test_items.index(item) + 1] = np.concatenate(probs).mean(0)[1]
+        results.append(res)
+
+    if dist.is_initialized():
+        results = np.concatenate(all_gather(results), axis=0)
+        organ_feat_dict = all_gather(organ_feat_dict)
+    else:
+        organ_feat_dict = [organ_feat_dict]
+    
+    if rank == 0:
+        os.makedirs('/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_from_default_pretrained_ckpt', exist_ok=True)
+        pd.DataFrame(
+            results,
+            columns=['file_name'] + ['_'.join(k) for k in datafolder.test_items]
+        ).to_csv(f'/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_from_default_pretrained_ckpt/{save_path}.csv', index=False, encoding='utf-8')
         
-        model.load_state_dict(ckpt['model'], strict=False)
-
-        rank = get_rank()
-        torch.cuda.set_device(rank)
-
-        model.eval()
-        model.cuda()
-
-        # Set global precision for printing tensors
-        torch.set_printoptions(precision=2)
-        
-        overlap = 0.25
-        roi_size = (112, 288, 352)
-
-        results = []
-        
-        # for each disease item, it has the text feature of the negative and positive prompts
-        text_feat_dict = model.prepare_text_feat(datafolder.test_items)
-
-        organ_feat_dict = {}
-
-        save_path = '_'.join(ckpt_path.replace('.pth', '').split('/')[1:])
-        
-        predictedall, realall = [], []
-        for i, (image, mask, test_items, meta_info) in enumerate(tqdm(dataloader, desc='Infer')):
-            fid = meta_info['file_name']
-            onehotlabels = meta_info['disease_labels']
-
-            organ_feat_dict[fid] = {}
-
-            image = image[None].cuda()
-            mask = mask[None].cuda()
-
-            test_organs = meta_info['test_organ_names']
-            
-            whole_organ_sizes = dict(zip(test_organs, [torch.eq(mask, datafolder.organs.index(test_organ) + 1).sum().item() for test_organ in test_organs]))    
-
-            test_organs = [test_organ for test_organ in test_organs if whole_organ_sizes[test_organ] > 0]
-            test_items = [test_item for test_item in test_items if test_item[0] in test_organs]
-
-            image_size = list(image.shape[2:])
-            num_spatial_dims = len(image.shape) - 2
-
-            scan_interval = _get_scan_interval(
-                image_size, roi_size, num_spatial_dims, overlap
-            )
-            slices = dense_patch_slices(image_size, roi_size, scan_interval)
-            num_win = len(slices)
-            organ_logits = dict(zip(test_items, [[] for _ in test_items]))
-            image_cls_feat = None
-
-            # iterate all the possible diseases specified in the Datafolder class
-            # note that each time it will finish all the disease prompt within the organ (if arrives to the if condition)
-            for k, v in organ_logits.items():
-                # skip the ones that have not dont zero-shot
-                if not len(v):
-                    organ_name = k[0]
-                    organ_id = datafolder.organs.index(organ_name)
-
-                    window_patch, window_mask = center_crop(
-                        image,
-                        torch.eq(mask, organ_id + 1),
-                        crop_size=roi_size
-                    )
-                    window_mask = window_mask.float()
-                    window_mask[window_mask == 1] = organ_id + 1
-
-                    pad_data = pad_func({'image': window_patch[0], 'label': window_mask[0]})
-                    window_patch, window_mask = pad_data['image'], pad_data['label']
-
-                    # print('EXTRA', organ_name, window_patch.size())
-                    # NOTE:
-                    # 1. in lavis folder's blip_pretrain forward_test_win
-                    # 2. check the BlipPretrain class in lavis.models.blip_models 
-                    # NOTE: IMPORTANT, it uses the mask of the input image to identify the organ and the associated organ projector.
-                    image_embeds, organ_logits = model.forward_test_win(
-                        window_patch[None], 
-                        window_mask[None],
-                        organ_logits, # recursively accumulate the stats for each organ
-                        test_organs,
-                        text_feat_dict,
-                        organ_feat_dict[fid],
-                        whole_organ_sizes,
-                        skip_organ=organ_id
-                    )
-                    # check if the image embeddings is a cls_tokens
-                    if image_embeds.shape[1] > 1: #[1, 1232, 768]
-                        image_embeds = image_embeds.mean(dim=1, keepdim=False) # [1, 768]
-                    
-                    if image_cls_feat is None:
-                        image_cls_feat = image_embeds.clone()
-                    # else:
-                    #     assert torch.all(image_cls_feat == image_embeds)
-
-            # gather the organ based classification results
-            res = [meta_info['file_name']] + [''] * len(datafolder.test_items)
-            organ_logits = {item: probs for item, probs in organ_logits.items() if len(probs) > 0}
-            for item, probs in organ_logits.items():
-                if len(probs) > 1:
-                    print('something wrong')
-                if np.concatenate(probs).shape != (1,2):
-                    print("shape is not expected")
-                # the following encode postive prompt probability in the excel sheet
-                # probs is [[[0.62, 0.37]]] represents the logit for negative and postive disease prompt for the particular diseases
-                # np.concatenate(probs).shape = (1,2)
-                # np.concatenate(probs).mean(0).shape = (,2), number does not change
-                # np.concatenate(probs).mean(0)[1] retrieve 0.37, the positive prompt logit score
-                res[datafolder.test_items.index(item) + 1] = np.concatenate(probs).mean(0)[1]
-            results.append(res)
-
-        if dist.is_initialized():
-            results = np.concatenate(all_gather(results), axis=0)
-            organ_feat_dict = all_gather(organ_feat_dict)
-        else:
-            organ_feat_dict = [organ_feat_dict]
-        
-        if rank == 0:
-            os.makedirs('/cluster/projects/mcintoshgroup/fvlm_files/rate_results', exist_ok=True)
-            pd.DataFrame(
-                results,
-                columns=['file_name'] + ['_'.join(k) for k in datafolder.test_items]
-            ).to_csv(f'/cluster/projects/mcintoshgroup/fvlm_files/rate_results/{save_path}.csv', index=False, encoding='utf-8')
-            
-            print('Save csv file successfully!')
+        print('Save csv file successfully!')
 
 if __name__ == '__main__':
     evaluate()
