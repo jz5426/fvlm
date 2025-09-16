@@ -18,22 +18,22 @@ def count_files_with_suffix(directory, suffix):
     return count
 
 def process_image(loader, mask_path):
-    # mask_path is resized_{phrase}_images
+    # mask_path is resized_{phrase}_fixed
     original_mask_path = mask_path
     img_path = None
     try:
-        phase = 'train' if 'train_mask' in mask_path else 'valid'
+        phase = 'train' if 'train_masks' in mask_path else 'valid'
 
         # mask_path = mask_path.replace(
         #     f"{phase}_mask", 
         #     f"resized_{phase}_masks")
-        img_path = mask_path.replace("masks", "images") # resized_{phrase}_images
+        img_path = mask_path.replace("masks", "fixed") # resized_{phrase}_fixed
 
         # if (
         #     Path(
         #         img_path.replace(
-        #             f"resized_{phase}_images", 
-        #             f"processed_{phase}_images")
+        #             f"resized_{phase}_fixed", 
+        #             f"processed_{phase}_fixed")
         #     ).exists()
         #     and Path(
         #         mask_path.replace(
@@ -98,7 +98,7 @@ def process_image(loader, mask_path):
                     output_dir=str(
                         Path(
                             img_path.replace(
-                                f"resized_{phase}_images", f"processed_{phase}_images")
+                                f"resized_{phase}_fixed", f"processed_{phase}_fixed")
                         ).parent
                     ),
                     keys=["image"],
@@ -165,18 +165,19 @@ if __name__ == "__main__":
     # image_root = f"{split}_fix"
     # mask_root = f"{split}_mask"
 
-    # NOTE: depends on the resized_{phrase}_images and resized_{phrase}_masks data
+    # NOTE: depends on the resized_{phrase}_fixed and resized_{phrase}_masks data
 
     split = 'valid'
     mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{split}_masks/'    
-    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{split}_images/'
+    image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{split}_fixed/'
     # patient_paths = _find_second_level_dirs(image_root, 'train_')
     # np.save("/cluster/projects/mcintoshgroup/fvlm_files/decomposed_report/patient_paths.npy", np.array(patient_paths))
 
     mask_paths = []
     for root, _, files in os.walk(mask_root):
         for file in files:
-            mask_paths.append(os.path.join(root, file))
+            if '.nii.gz' in file:
+                mask_paths.append(os.path.join(root, file))
 
     loader = transforms.Compose(
         [
@@ -188,7 +189,7 @@ if __name__ == "__main__":
             )
         ])
 
-    max_workers = 10
+    max_workers = 5
     func = partial(process_image, loader)
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for _ in tqdm(executor.map(func, mask_paths), total=len(mask_paths)):

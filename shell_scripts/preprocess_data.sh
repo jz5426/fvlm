@@ -15,7 +15,7 @@ source activate fvlm
 
 # train split
 # python /cluster/home/t135419uhn/fvlm/data/fix_data.py
-python /cluster/home/t135419uhn/fvlm/data/generate_mask.py
-python /cluster/home/t135419uhn/fvlm/data/resize.py
+# python /cluster/home/t135419uhn/fvlm/data/generate_mask.py
+# python /cluster/home/t135419uhn/fvlm/data/resize.py
 python /cluster/home/t135419uhn/fvlm/data/preprocess.py
 

@@ -24,12 +24,12 @@ def process(mask_path):
 
         # TO BE SAVED PATH
         relative_path = "/".join(mask_path.split("/")[-3:]) # from patient fold all the way to the .nii.gz vol
-        processed_image_path = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{phase}_images/" + relative_path
+        processed_image_path = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{phase}_fixed/" + relative_path
         processed_mask_path = f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{phase}_masks/" + relative_path
 
         # Step 1: check if merged masks exists
-        # if Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/merged_{phase}_masks/" + relative_path).exists(): # indicate processed
-        #     return
+        if Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/merged_{phase}_masks/" + relative_path).exists(): # indicate processed
+            return
 
         # create the merged mask directory
         Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/merged_{phase}_masks/" + relative_path).parent.mkdir(parents=True, exist_ok=True)
@@ -184,7 +184,7 @@ def process(mask_path):
 
         # # Step 2: Resize image and mask
         # if (
-        #     Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{phase}_images/" + relative_path).exists()
+        #     Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{phase}_fixed/" + relative_path).exists()
         #     and Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{phase}_masks/" + relative_path).exists()
         # ):
         #     return
@@ -193,8 +193,8 @@ def process(mask_path):
         Path(processed_image_path).parent.mkdir(parents=True, exist_ok=True)
         Path(processed_mask_path).parent.mkdir(parents=True, exist_ok=True)
 
-        image_path = mask_path.replace(f"{phase}_mask", f"{phase}_fixed")
-        mask_path = mask_path.replace(f'{phase}_mask', f'merged_{phase}_masks') # from here it uses the merged mask as the source data
+        image_path = mask_path.replace(f"{phase}_masks", f"{phase}_fixed")
+        mask_path = mask_path.replace(f'{phase}_masks', f'merged_{phase}_masks') # from here it uses the merged mask as the source data
 
         data = {"image": image_path, "label": mask_path}
         res = transforms.LoadImaged(keys=["image", "label"], image_only=False, ensure_channel_first=True)(data)
@@ -214,7 +214,7 @@ def process(mask_path):
                 transforms.Resized(spatial_size=target_size, keys=["label"], mode="nearest"),
                 # saving the resized image
                 transforms.SaveImaged(
-                    output_dir=Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{phase}_images/" + relative_path).parent,
+                    output_dir=Path(f"/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/resized_{phase}_fixed/" + relative_path).parent,
                     keys=["image"],
                     output_postfix="",
                     separate_folder=False,
@@ -237,7 +237,7 @@ def process(mask_path):
         print("ERROR: ", mask_path, e)
         return
 
-    ## remove the mask from the _mask folder if successfully resized.
+    ## remove the mask from the _masks folder if successfully resized.
     # if original_mask_path and os.path.isfile(original_mask_path):
     #     os.remove(original_mask_path)
     #     print(f"Removed image mask file {original_mask_path} from _mask_path folder")
@@ -253,18 +253,19 @@ def process(mask_path):
     #     print(f"image merged mask file {merged_mask} does not exist.")
     
 if "__main__" == __name__:
-    #NOTE: depends on the _fix and _mask data
+    #NOTE: depends on the _fix and _masks data
 
     split = 'valid'
     image_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{split}_fixed'
-    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{split}_mask/'
+    mask_root = f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{split}_masks/'
 
     mask_paths = []
     for root, _, files in os.walk(mask_root):
         for file in files:
-            mask_paths.append(os.path.join(root, file))
+            if '.nii.gz' in file:
+                mask_paths.append(os.path.join(root, file))
     
-    max_workers = 10
+    max_workers = 5
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for _ in tqdm(executor.map(process, mask_paths), total=len(mask_paths)):
             pass
@@ -280,7 +281,7 @@ if "__main__" == __name__:
     #     shutil.rmtree(image_root)
     #     print(f"{image_root} removed.")
 
-    ## remove the _mask image directory
+    ## remove the _masks image directory
     # if os.path.isdir(mask_root) and count_files_with_suffix(mask_root, '.nii.gz') == 0:
     #     shutil.rmtree(mask_root)
     #     print(f"{mask_root} removed.")

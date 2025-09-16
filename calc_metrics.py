@@ -39,11 +39,14 @@ def find_threshold(probabilities, true_labels):
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--csv_file', type=str, default='/cluster/projects/mcintoshgroup/fvlm_files/rate_results/cluster_projects_mcintoshgroup_fvlm_files_train_outputs_20250428132_checkpoint_10.csv') # this gets the best performance.
+# parser.add_argument('--csv_file', type=str, default='/cluster/projects/mcintoshgroup/fvlm_files/rate_results/cluster_projects_mcintoshgroup_fvlm_files_train_outputs_20250428132_checkpoint_10.csv') # this gets the best performance.
+parser.add_argument('--csv_file', type=str, default='/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_results_from_default_pretrained_ckpt/zero_shot_results.csv') # this gets the best performance.
 args = parser.parse_args()
 
 # label_csv = pd.read_csv('data/multi_abnormality_labels/valid_predicted_labels.csv')
-label_csv = pd.read_csv('/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/dataset_multi_abnormality_labels_train_predicted_labels.csv')
+# label_csv = pd.read_csv('/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/dataset_multi_abnormality_labels_train_predicted_labels.csv')
+label_csv = pd.read_csv('/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/valid_predicted_labels.csv')
+
 
 result = pd.read_csv(args.csv_file)
 

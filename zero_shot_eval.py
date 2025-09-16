@@ -11,12 +11,14 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from monai import transforms
 from monai.data.utils import dense_patch_slices
-from typing import Any, Callable, List, Sequence, Tuple, Union
-from torch import nn, einsum
+from typing import Sequence, Tuple
 from lavis.common.config import Config
 from lavis.common.registry import registry
-from lavis.common.dist_utils import get_rank, init_distributed_mode
-from transformers import BertTokenizer
+from lavis.common.dist_utils import get_rank
+
+# import sys
+# if os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) not in sys.path:
+#     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 def apply_softmax(array):
@@ -139,7 +141,7 @@ class DataFolder(Dataset):
     def __init__(self, report_file, label_file, file_extension='.nii.gz'):
         super().__init__()
 
-        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/valid_fixed'
+        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/processed_valid_fixed'
         self.file_extension = file_extension
         img_paths = []
         for root, _, files in os.walk(vis_root):
@@ -162,7 +164,8 @@ class DataFolder(Dataset):
         ]
 
         self.loader = transforms.Compose([
-            transforms.LoadImaged(keys=["image", "label"], image_only=True, ensure_channel_first=True)
+            transforms.LoadImaged(keys=["image", "label"], image_only=True, ensure_channel_first=True),
+            transforms.ToTensord(keys=["image", "label"]),  # ensure tensor
         ])
         
         self.pathologies = [
@@ -259,7 +262,7 @@ class DataFolder(Dataset):
     def __getitem__(self, index):
         image_path = self.img_paths[index]
         # automatically get the mask directory
-        mask_path = image_path.replace('images', 'masks')
+        mask_path = image_path.replace('fixed', 'masks')
         
         file_name = image_path.split('/')[-1]
         input_path = {'image': image_path, 'label': mask_path}
@@ -276,12 +279,12 @@ class DataFolder(Dataset):
             'disease_labels': self.image_labels[index]
         }
         
-        return data['image'].as_tensor(), data['label'].as_tensor(), test_items, meta_info
+        # return data['image'].as_tensor(), data['label'].as_tensor(), test_items, meta_info
+        return data['image'], data['label'], test_items, meta_info
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument('--csv_file', type=str, help='The path to the CSV file for processing.')
-
     parser.add_argument("--cfg-path", required=False, default='lavis/projects/blip/train/pretrain_ct.yaml', help="path to configuration file.")
     parser.add_argument(
         "--options",
@@ -317,12 +320,12 @@ def evaluate():
     )
     
     pad_func = transforms.DivisiblePadd(
-                    keys=["image", "label"], 
-                    k=(16, 16, 32),
-                    mode='constant', 
-                    constant_values=0,
-                    method="end"
-            )
+        keys=["image", "label"], 
+        k=(16, 16, 32),
+        mode='constant', 
+        constant_values=0,
+        method="end"
+    )
     
     model_config = cfg.model_cfg
     model_cls = registry.get_model_class(model_config.arch)
@@ -334,7 +337,9 @@ def evaluate():
         ckpt_path, map_location='cpu'
     )
     
-    model.load_state_dict(ckpt['model'], strict=False)
+    missing, unexpected = model.load_state_dict(ckpt['model'], strict=False)
+    print('Missing: ', missing)
+    print('Unexpected: ', unexpected)
 
     rank = get_rank()
     torch.cuda.set_device(rank)
@@ -359,6 +364,7 @@ def evaluate():
     
     predictedall, realall = [], []
     for i, (image, mask, test_items, meta_info) in enumerate(tqdm(dataloader, desc='Infer')):
+
         fid = meta_info['file_name']
         onehotlabels = meta_info['disease_labels']
 
@@ -451,11 +457,11 @@ def evaluate():
         organ_feat_dict = [organ_feat_dict]
     
     if rank == 0:
-        os.makedirs('/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_from_default_pretrained_ckpt', exist_ok=True)
+        os.makedirs('/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_results_from_default_pretrained_ckpt', exist_ok=True)
         pd.DataFrame(
             results,
             columns=['file_name'] + ['_'.join(k) for k in datafolder.test_items]
-        ).to_csv(f'/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_from_default_pretrained_ckpt/{save_path}.csv', index=False, encoding='utf-8')
+        ).to_csv(f'/cluster/projects/mcintoshgroup/fvlm_files/zero_shot_results_from_default_pretrained_ckpt/zero_shot_results.csv', index=False, encoding='utf-8')
         
         print('Save csv file successfully!')
 

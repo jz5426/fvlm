@@ -27,7 +27,7 @@ def generate_mask(row):
     ## NOTE: for original valid_fixed files
     filepath = os.path.join(f'/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/{split}_fixed', dir2, dir1, VolumeName)
     dirpath = os.path.dirname(filepath)
-    dirpath = dirpath.replace(f"/{split}_fixed/", f"/{split}_mask/")
+    dirpath = dirpath.replace(f"/{split}_fixed/", f"/{split}_masks/")
 
     # skip the files if not exists in the data directory
     if not os.path.exists(filepath):
@@ -42,7 +42,7 @@ def generate_mask(row):
 
     Path(dirpath).mkdir(parents=True, exist_ok=True)
     nib.save(output_img, os.path.join(dirpath, os.path.basename(filepath)))
-    print(f'finish processing {os.path.join(dirpath, os.path.basename(filepath))}')
+    # print(f'finish processing {os.path.join(dirpath, os.path.basename(filepath))}')
 
 
 if __name__ == "__main__":

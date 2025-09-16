@@ -136,7 +136,7 @@ class DataFolder(Dataset):
     def __init__(self, report_file, label_file, file_extension='.nii.gz'):
         super().__init__()
 
-        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/CTRATE_Volumes_raw_h5_fp16_noflip_processed_val_images'
+        vis_root = '/cluster/projects/mcintoshgroup/publicData/CT-RATE-Processed/benchmark/processed_valid_fixed'
         self.file_extension = file_extension
         img_paths = []
         for root, _, files in os.walk(vis_root):
@@ -300,9 +300,13 @@ def evaluate():
 
     # validation dataset
     # TODO: supposed to be the report and labels file for val split but for the testing, our val split comes from the train split.
+    # datafolder = DataFolder(
+    #     report_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/radiology_text_reports/train_reports.csv',
+    #     label_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/dataset_multi_abnormality_labels_train_predicted_labels.csv' 
+    # )
     datafolder = DataFolder(
-        report_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/radiology_text_reports/train_reports.csv',
-        label_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/dataset_multi_abnormality_labels_train_predicted_labels.csv' 
+        report_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/radiology_text_reports/valid_reports.csv',
+        label_file='/cluster/projects/mcintoshgroup/publicData/CT-RATE/dataset/multi_abnormality_labels/valid_predicted_labels.csv' 
     )
     dataloader = DataLoader(
         datafolder,
@@ -325,13 +329,13 @@ def evaluate():
     model_cls = registry.get_model_class(model_config.arch)
     model = model_cls.from_config(model_config)
 
-    for epoch in range(0, 51): # NOTE: this is for the checkpoint.
-    # for epoch in range(0, 1):
+    # for epoch in range(0, 51): # NOTE: this is for the checkpoint.
+    for epoch in range(0, 1):
 
         print(f'Epoch: {epoch}')
 
-        ckpt_path = f'/cluster/projects/mcintoshgroup/fvlm_files/train_outputs/20250428132/checkpoint_{epoch}.pth'
-        # ckpt_path = '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'        
+        # ckpt_path = f'/cluster/projects/mcintoshgroup/fvlm_files/train_outputs/20250428132/checkpoint_{epoch}.pth'
+        ckpt_path = '/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/checkpoints/model.pth'        
         ckpt = torch.load(
             ckpt_path, map_location='cpu'
         )

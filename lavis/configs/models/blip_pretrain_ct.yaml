@@ -6,7 +6,7 @@
 model:
   arch: blip_pretrain
 
-  load_pretrained: False # since we initialize from pretrained checkpoint
+  load_pretrained: True # since we initialize from pretrained checkpoint
   pretrained: "/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/model_base_capfilt_large.pth"
 
   vit_type: "base"
@@ -17,7 +17,7 @@ model:
   alpha: 0.5
 
   # bert config
-  med_config_path:  "/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized/config.json"
+  med_config_path: "/cluster/projects/mcintoshgroup/fvlm_files/fvlm_weights/BiomedVLP-CXR-BERT-specialized/config.json"
 
   embed_dim: 256
 
